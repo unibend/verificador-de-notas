@@ -24,17 +24,30 @@ Sigue estos sencillos pasos para instalar y ejecutar el verificador de notas:
 ### Ejecución (Windows):
 
 #### Opción Recomendada (con automatización):
-1. Abre la carpeta donde extrajiste los archivos.
-2. Haz clic derecho en un espacio vacío dentro de la carpeta mientras mantienes presionada la tecla Shift.
-3. Selecciona "Abrir la ventana de PowerShell aquí" o "Abrir PowerShell como administrador".
-4. En la ventana de PowerShell, escribe `python run.py` y presiona Enter.
-5. El programa `setup.py` se iniciará automáticamente. Sigue las instrucciones en pantalla. Este proceso configurará una tarea programada en Windows para que el verificador se ejecute cada 30 minutos.
+1. Abre el menú Inicio y busca "PowerShell".
+2. Haz clic derecho en "Windows PowerShell" y selecciona "Ejecutar como administrador".
+3. En la ventana de PowerShell, navega a la carpeta del proyecto:
+   - Primero, encuentra la ruta completa de la carpeta donde extrajiste los archivos (puedes hacerlo abriendo la carpeta en el Explorador de Archivos y copiando la ruta desde la barra de direcciones).
+   - Luego escribe en PowerShell: `cd "ruta\completa\a\la\carpeta"` (reemplaza con tu ruta real, manteniendo las comillas).
+   - Ejemplo: `cd "C:\Users\TuUsuario\Documents\verificador-de-notas"`
+4. Una vez en la carpeta correcta, escribe `python run.py` y presiona Enter.
+5. El programa `setup.py` se iniciará automáticamente. Sigue las instrucciones en pantalla para configurar la automatización.
 
-#### Opción Manual (sin automatización):
+#### Opción Alternativa (sin administrador):
 1. Abre la carpeta donde extrajiste los archivos.
-2. Haz doble clic en el archivo `run.py`.
-3. El programa `setup.py` se iniciará automáticamente. Sigue las instrucciones en pantalla. Si no lo ejecutas como administrador, el programa funcionará, pero no se configurará para ejecutarse automáticamente.
-4. Puedes ejecutar la aplicación manualmente en cualquier momento haciendo doble clic en el archivo `verificador_notas.bat` (este archivo se crea durante la instalación).
+2. Haz clic derecho en un espacio vacío mientras mantienes presionada la tecla Shift.
+3. Selecciona "Abrir la ventana de PowerShell aquí".
+4. Escribe `python run.py` y presiona Enter.
+5. Sigue las instrucciones en pantalla. Nota: sin permisos de administrador, el programa no podrá configurar la ejecución automática.
+
+#### Opción con Terminal Windows (Windows 10/11):
+1. Abre la Terminal Windows (puedes buscarla en el menú Inicio).
+2. Navega a la carpeta del proyecto usando: `cd "ruta\completa\a\la\carpeta"`
+3. Ejecuta: `python run.py`
+4. Sigue las instrucciones en pantalla.
+
+#### Opción Manual:
+Después de la instalación inicial, puedes ejecutar la aplicación manualmente en cualquier momento haciendo doble clic en el archivo `verificador_notas.bat` (este archivo se crea durante la instalación).
 
 ## 💡 Funcionamiento Interno (Diseño)
 
