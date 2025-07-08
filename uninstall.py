@@ -8,46 +8,81 @@ def print_banner():
     print("=" * 60)
     print("🗑️  DESINSTALADOR DE VERIFICADOR DE NOTAS UNETI")
     print("=" * 60)
-    print("Este programa eliminará la tarea programada del verificador")
+    print("Este programa eliminará las tareas programadas del verificador")
     print("de notas y opcionalmente los archivos relacionados.")
     print("=" * 60)
     print()
 
-def check_task_exists():
-    """Verificar si la tarea programada existe"""
+def check_task_exists(task_name):
+    """Verificar si una tarea programada existe"""
     try:
-        cmd = ['schtasks', '/query', '/tn', 'VerificadorNotasUNETI']
+        cmd = ['schtasks', '/query', '/tn', task_name]
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.returncode == 0
     except Exception:
         return False
 
-def remove_scheduled_task():
-    """Eliminar la tarea programada"""
-    print("🔄 Eliminando tarea programada...")
+def remove_scheduled_tasks():
+    """Eliminar las tareas programadas"""
+    print("🔄 Eliminando tareas programadas...")
     print("-" * 40)
     
-    try:
-        # Verificar si la tarea existe
-        if not check_task_exists():
-            print("ℹ️  La tarea programada 'VerificadorNotasUNETI' no existe.")
-            return True
-        
-        # Eliminar la tarea
-        cmd = ['schtasks', '/delete', '/tn', 'VerificadorNotasUNETI', '/f']
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        
-        if result.returncode == 0:
-            print("✅ Tarea programada eliminada exitosamente!")
-            return True
-        else:
-            print("❌ Error al eliminar la tarea programada")
-            print(f"Error: {result.stderr}")
-            return False
+    # Lista de tareas a eliminar (nombres antiguos y nuevos)
+    tasks_to_remove = [
+        "VerificadorNotasUNETI",  # Tarea antigua (una sola tarea)
+        "VerificadorNotasUNETI_Daily",  # Tarea diaria nueva
+        "VerificadorNotasUNETI_Interval"  # Tarea de intervalo nueva
+    ]
+    
+    tasks_found = []
+    tasks_removed = []
+    errors = []
+    
+    # Verificar qué tareas existen
+    for task_name in tasks_to_remove:
+        if check_task_exists(task_name):
+            tasks_found.append(task_name)
+    
+    if not tasks_found:
+        print("ℹ️  No se encontraron tareas programadas del verificador de notas.")
+        return True
+    
+    print(f"📋 Se encontraron {len(tasks_found)} tarea(s) programada(s):")
+    for task in tasks_found:
+        print(f"   • {task}")
+    print()
+    
+    # Eliminar cada tarea encontrada
+    for task_name in tasks_found:
+        try:
+            print(f"🗑️  Eliminando tarea: {task_name}")
+            cmd = ['schtasks', '/delete', '/tn', task_name, '/f']
+            result = subprocess.run(cmd, capture_output=True, text=True)
             
-    except Exception as e:
-        print(f"❌ Error al eliminar la tarea programada: {e}")
+            if result.returncode == 0:
+                print(f"✅ Tarea '{task_name}' eliminada exitosamente!")
+                tasks_removed.append(task_name)
+            else:
+                print(f"❌ Error al eliminar tarea '{task_name}'")
+                print(f"   Error: {result.stderr}")
+                errors.append(task_name)
+                
+        except Exception as e:
+            print(f"❌ Error al eliminar tarea '{task_name}': {e}")
+            errors.append(task_name)
+    
+    # Mostrar resumen
+    print()
+    if tasks_removed:
+        print(f"✅ {len(tasks_removed)} tarea(s) eliminada(s) exitosamente")
+    
+    if errors:
+        print(f"❌ {len(errors)} tarea(s) no se pudieron eliminar:")
+        for task in errors:
+            print(f"   • {task}")
         return False
+    
+    return True
 
 def validate_file_path(filename):
     """Validar que el archivo esté en el directorio actual"""
@@ -71,7 +106,8 @@ def ask_delete_files():
     files_to_check = [
         ("verificador_notas.bat", "Archivo batch para ejecución manual"),
         ("previous_grades.json", "Datos de notas anteriores guardadas"),
-        ("grade_history.txt", "Historial completo de cambios de notas")
+        ("grade_history.txt", "Historial completo de cambios de notas"),
+        ("grade_checker.py.backup", "Backup del archivo original del verificador")
     ]
     
     files_to_delete = []
@@ -185,10 +221,12 @@ def show_final_message(task_removed, files_deleted, token_reset):
     print("=" * 60)
     
     if task_removed:
-        print("✅ Tarea programada eliminada exitosamente")
+        print("✅ Tareas programadas eliminadas exitosamente")
         print("   • El verificador ya no se ejecutará automáticamente")
+        print("   • Se eliminaron tanto la tarea diaria como la de intervalos")
     else:
-        print("❌ La tarea programada no se pudo eliminar completamente")
+        print("❌ Algunas tareas programadas no se pudieron eliminar completamente")
+        print("   • Es posible que necesites eliminarlas manualmente desde el Programador de tareas")
     
     if files_deleted:
         print("✅ Archivos seleccionados eliminados")
@@ -205,7 +243,8 @@ def show_final_message(task_removed, files_deleted, token_reset):
         "grade_checker.py",
         "verificador_notas.bat", 
         "previous_grades.json",
-        "grade_history.txt"
+        "grade_history.txt",
+        "grade_checker.py.backup"
     ]
     
     for filename in files_to_check:
@@ -222,8 +261,9 @@ def show_final_message(task_removed, files_deleted, token_reset):
     print()
     print("ℹ️  NOTAS IMPORTANTES:")
     print("• El script principal del verificador sigue disponible")
-    print("• Puedes volver a configurar la automatización ejecutando el setup")
+    print("• Puedes volver a configurar la automatización ejecutando el configurador")
     print("• Los datos de notas se mantienen a menos que los hayas eliminado")
+    print("• Para reconfigurar, ejecuta 'configurador.py' nuevamente")
     print("=" * 60)
 
 def main():
@@ -238,6 +278,7 @@ def main():
     
     print("⚠️  ADVERTENCIA:")
     print("Este proceso eliminará la ejecución automática del verificador de notas.")
+    print("Se eliminarán TODAS las tareas programadas relacionadas (diaria e intervalos).")
     print("¿Estás seguro de que quieres continuar?")
     print()
     
@@ -255,8 +296,8 @@ def main():
     print()
     
     try:
-        # Paso 1: Eliminar tarea programada
-        task_removed = remove_scheduled_task()
+        # Paso 1: Eliminar tareas programadas
+        task_removed = remove_scheduled_tasks()
         
         # Paso 2: Preguntar por archivos
         files_to_delete = ask_delete_files()
