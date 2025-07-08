@@ -49,7 +49,7 @@ def get_time_schedule():
     print("\n⏰ CONFIGURACIÓN DE HORARIO")
     print("-" * 40)
     print("Configura el horario en que quieres que funcione el verificador.")
-    print("El verificador se ejecutará cada 30 minutos durante este período.")
+    print("El verificador se ejecutará cada 30 minutos durante todo el día.")
     print()
     
     # Hora de inicio
@@ -309,7 +309,7 @@ def ask_for_automation():
     """Preguntar si quiere automatización"""
     print("\n⚙️ PASO 4: Configuración de automatización")
     print("-" * 40)
-    print("¿Quieres que el verificador se ejecute automáticamente en un horario específico?")
+    print("¿Quieres que el verificador se ejecute automáticamente cada 30 minutos?")
     print("Esto te permitirá recibir notificaciones cuando cambien tus notas.")
     print()
     
@@ -360,51 +360,6 @@ pause
         print(f"❌ Error al crear archivo batch: {e}")
         return None
 
-def create_execution_script(batch_path, start_time, end_time, interval):
-    """Crear script de ejecución temporal para tareas programadas (silencioso)"""
-    try:
-        script_dir = get_script_directory()
-        python_exe = sys.executable
-        script_path = os.path.join(script_dir, "grade_checker.py")
-        exec_script_path = os.path.join(script_dir, "ejecutor_temporal.bat")
-        
-        print(f"📂 Creando script de ejecución temporal en: {exec_script_path}")
-        
-        # Contenido del script que ejecuta el verificador hasta la hora de fin
-        # Usa pythonw.exe para ejecución silenciosa y redirige salida a NUL
-        exec_content = f'''@echo off
-setlocal enabledelayedexpansion
-
-:loop
-rem Obtener hora actual
-for /f "tokens=1-2 delims=:" %%a in ('time /t') do (
-    set current_time=%%a:%%b
-)
-
-rem Comparar con hora de fin
-if "!current_time!" geq "{end_time}" (
-    exit /b 0
-)
-
-rem Ejecutar verificador silenciosamente
-"{python_exe}" "{script_path}" >nul 2>&1
-
-rem Esperar el intervalo especificado (en segundos)
-timeout /t {interval * 60} /nobreak >nul 2>&1
-
-goto :loop
-'''
-        
-        with open(exec_script_path, 'w', encoding='utf-8') as f:
-            f.write(exec_content)
-        
-        print(f"✅ Script de ejecución temporal creado: {exec_script_path}")
-        return exec_script_path
-        
-    except Exception as e:
-        print(f"❌ Error al crear script de ejecución temporal: {e}")
-        return None
-
 def add_to_task_scheduler(batch_path, start_time, end_time, interval):
     """Agregar tareas al programador de tareas de Windows"""
     print("\n📅 Configurando tareas programadas...")
@@ -412,71 +367,66 @@ def add_to_task_scheduler(batch_path, start_time, end_time, interval):
     
     try:
         # Nombres de las tareas
-        trigger_task_name = "VerificadorNotasUNETI_Trigger"
-        execution_task_name = "VerificadorNotasUNETI_Execution"
+        daily_task_name = "VerificadorNotasUNETI_Daily"
+        interval_task_name = "VerificadorNotasUNETI_Interval"
         
         # Validar que el archivo batch existe
         if not os.path.exists(batch_path):
             print(f"❌ El archivo batch no existe: {batch_path}")
             return False
         
-        # Crear script de ejecución temporal
-        exec_script_path = create_execution_script(batch_path, start_time, end_time, interval)
-        if not exec_script_path:
-            return False
+        print("⏳ Creando tarea programada diaria...")
         
-        print("⏳ Creando tarea trigger (disparador diario)...")
-        
-        # Comando para crear la tarea trigger que se ejecuta diariamente
-        trigger_cmd = [
+        # Comando para crear la tarea diaria
+        daily_task_cmd = [
             'schtasks', '/create',
-            '/tn', trigger_task_name,
-            '/tr', f'schtasks /run /tn {execution_task_name}',
+            '/tn', daily_task_name,
+            '/tr', f'"{batch_path}"',
             '/sc', 'daily',
             '/st', start_time,
             '/f'
         ]
         
-        trigger_result = subprocess.run(trigger_cmd, capture_output=True, text=True)
+        result = subprocess.run(daily_task_cmd, capture_output=True, text=True)
         
-        if trigger_result.returncode != 0:
-            print("❌ Error al crear la tarea trigger")
-            print(f"Error: {trigger_result.stderr}")
+        if result.returncode != 0:
+            print("❌ Error al crear la tarea programada diaria")
+            print(f"Error: {result.stderr}")
             return False
         
-        print("✅ Tarea trigger creada exitosamente!")
+        print("✅ Tarea diaria creada exitosamente!")
         
-        print("⏳ Creando tarea de ejecución...")
+        print("⏳ Creando tarea programada por intervalos...")
         
-        # Comando para crear la tarea de ejecución que se ejecuta cuando es disparada
-        execution_cmd = [
+        # Comando para crear la tarea que se ejecuta cada intervalo especificado
+        interval_task_cmd = [
             'schtasks', '/create',
-            '/tn', execution_task_name,
-            '/tr', f'"{exec_script_path}"',
-            '/sc', 'once',
+            '/tn', interval_task_name,
+            '/tr', f'"{batch_path}"',
+            '/sc', 'minute',
+            '/mo', str(interval),
             '/st', start_time,
+            '/et', end_time,
             '/f'
         ]
         
-        execution_result = subprocess.run(execution_cmd, capture_output=True, text=True)
+        result = subprocess.run(interval_task_cmd, capture_output=True, text=True)
         
-        if execution_result.returncode != 0:
-            print("❌ Error al crear la tarea de ejecución")
-            print(f"Error: {execution_result.stderr}")
-            
-            # Limpiar la tarea trigger si falló la de ejecución
-            subprocess.run(['schtasks', '/delete', '/tn', trigger_task_name, '/f'], 
-                         capture_output=True, text=True)
+        if result.returncode != 0:
+            print("❌ Error al crear la tarea programada por intervalos")
+            print(f"Error: {result.stderr}")
+            # Eliminar la tarea diaria si falló la de intervalos
+            subprocess.run(['schtasks', '/delete', '/tn', daily_task_name, '/f'], 
+                          capture_output=True, text=True)
             return False
         
-        print("✅ Tarea de ejecución creada exitosamente!")
-        print(f"📋 Tarea trigger: {trigger_task_name}")
-        print(f"📋 Tarea de ejecución: {execution_task_name}")
-        print(f"⏰ Se ejecutará diariamente desde las {start_time} hasta las {end_time}")
-        print(f"⏱️  Intervalo: cada {interval} minutos")
+        print("✅ Tarea por intervalos creada exitosamente!")
+        print(f"📋 Tareas creadas:")
+        print(f"   • {daily_task_name} - Se ejecuta diariamente a las {start_time}")
+        print(f"   • {interval_task_name} - Se ejecuta cada {interval} minutos entre {start_time} y {end_time}")
         print("\nPara gestionar las tareas puedes:")
         print("• Abrir 'Programador de tareas' en Windows")
-        print(f"• Buscar las tareas que comienzan con 'VerificadorNotasUNETI'")
+        print(f"• Buscar las tareas '{daily_task_name}' y '{interval_task_name}'")
         print("• Desde ahí puedes habilitarlas, deshabilitarlas o eliminarlas")
         return True
         
@@ -526,7 +476,7 @@ def run_grade_checker():
         print(f"❌ Error al ejecutar el verificador: {e}")
         return False
 
-def show_final_instructions(automation_enabled, start_time=None, end_time=None, interval=None):
+def show_final_instructions(automation_enabled):
     """Mostrar instrucciones finales"""
     print("\n🎉 ¡CONFIGURACIÓN COMPLETADA!")
     print("=" * 60)
@@ -537,9 +487,8 @@ def show_final_instructions(automation_enabled, start_time=None, end_time=None, 
     print("• ✅ Script del verificador actualizado")
     print("• ✅ Verificación inicial completada")
     if automation_enabled:
-        print("• ✅ Tareas programadas configuradas")
-        print(f"  - Horario: {start_time} a {end_time}")
-        print(f"  - Intervalo: cada {interval} minutos")
+        print("• ✅ Tarea programada configurada")
+        print("  - Se ejecutará cada 30 minutos automáticamente")
     else:
         print("• ⚠️  Automatización omitida")
     print()
@@ -551,8 +500,6 @@ def show_final_instructions(automation_enabled, start_time=None, end_time=None, 
     print()
     print("📝 ARCHIVOS CREADOS:")
     print("• verificador_notas.bat - Para ejecutar manualmente")
-    if automation_enabled:
-        print("• ejecutor_temporal.bat - Script de ejecución temporal")
     print("• previous_grades.json - Datos de notas anteriores")
     print("• grade_history.txt - Historial de cambios")
     print("• grade_checker.py.backup - Respaldo del archivo original")
@@ -568,7 +515,7 @@ def show_final_instructions(automation_enabled, start_time=None, end_time=None, 
     print("• Para ver el historial: abrir 'grade_history.txt'")
     if automation_enabled:
         print("• Para gestionar la automatización: buscar 'VerificadorNotasUNETI' en el Programador de tareas")
-        print("• Para detener la automatización: deshabilitar ambas tareas en el Programador de tareas")
+        print("• Para detener la automatización: deshabilitar la tarea en el Programador de tareas")
     else:
         print("• Para configurar automatización: ejecutar este configurador nuevamente")
     print()
@@ -637,25 +584,29 @@ def main():
         
         # Paso 4: Configurar automatización (si no se omite)
         automation_enabled = False
-        start_time = end_time = interval = None
         
         if args.skip_automation:
             print("\n⚠️  Omitiendo configuración de automatización")
             automate = False
+            # Valores por defecto para cuando se omite la automatización
+            start_time, end_time, interval = "08:00", "22:00", 30
         else:
             automate = ask_for_automation()
+            if automate:
+                # Obtener horario solo si se va a automatizar
+                start_time, end_time, interval = get_time_schedule()
+            else:
+                # Valores por defecto para cuando no se automatiza
+                start_time, end_time, interval = "08:00", "22:00", 30
         
         batch_path = None
         if automate:
-            # Obtener horario del usuario
-            start_time, end_time, interval = get_time_schedule()
-            
             batch_path = create_batch_file()
             if batch_path:
                 if add_to_task_scheduler(batch_path, start_time, end_time, interval):
                     automation_enabled = True
                 else:
-                    print("⚠️  Las tareas programadas no se pudieron crear, pero puedes ejecutar manualmente.")
+                    print("⚠️  La tarea programada no se pudo crear, pero puedes ejecutar manualmente.")
             else:
                 print("⚠️  No se pudo crear el archivo batch para la automatización.")
         else:
@@ -664,11 +615,11 @@ def main():
         
         # Paso 5: Ejecutar por primera vez
         if run_grade_checker():
-            show_final_instructions(automation_enabled, start_time, end_time, interval)
+            show_final_instructions(automation_enabled)
         else:
             print("⚠️  Hubo un problema en la primera ejecución, pero la configuración está completa.")
             print("Puedes intentar ejecutar 'verificador_notas.bat' manualmente.")
-            show_final_instructions(automation_enabled, start_time, end_time, interval)
+            show_final_instructions(automation_enabled)
         
     except KeyboardInterrupt:
         print("\n\n❌ Configuración cancelada por el usuario.")
