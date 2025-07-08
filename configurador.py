@@ -33,6 +33,90 @@ def validate_username(username):
     
     return True, ""
 
+def validate_time(time_str):
+    """Validar formato de hora HH:MM"""
+    if not re.match(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$', time_str):
+        return False, "Formato de hora inválido. Use HH:MM (ejemplo: 08:30)"
+    
+    hour, minute = map(int, time_str.split(':'))
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        return False, "Hora inválida. Use formato 24 horas (00:00 a 23:59)"
+    
+    return True, ""
+
+def get_time_schedule():
+    """Obtener horario de funcionamiento del usuario"""
+    print("\n⏰ CONFIGURACIÓN DE HORARIO")
+    print("-" * 40)
+    print("Configura el horario en que quieres que funcione el verificador.")
+    print("El verificador se ejecutará cada 30 minutos durante este período.")
+    print()
+    
+    # Hora de inicio
+    while True:
+        start_time = input("🌅 Hora de inicio (formato HH:MM, ejemplo: 08:00): ").strip()
+        
+        valid, error_msg = validate_time(start_time)
+        if valid:
+            break
+        else:
+            print(f"❌ {error_msg}")
+    
+    # Hora de fin
+    while True:
+        end_time = input("🌙 Hora de fin (formato HH:MM, ejemplo: 22:00): ").strip()
+        
+        valid, error_msg = validate_time(end_time)
+        if not valid:
+            print(f"❌ {error_msg}")
+            continue
+        
+        # Validar que la hora de fin sea posterior a la de inicio
+        start_hour, start_min = map(int, start_time.split(':'))
+        end_hour, end_min = map(int, end_time.split(':'))
+        
+        start_minutes = start_hour * 60 + start_min
+        end_minutes = end_hour * 60 + end_min
+        
+        if end_minutes <= start_minutes:
+            print("❌ La hora de fin debe ser posterior a la hora de inicio")
+            continue
+        
+        # Validar que haya al menos 30 minutos de diferencia
+        if end_minutes - start_minutes < 30:
+            print("❌ Debe haber al menos 30 minutos entre la hora de inicio y fin")
+            continue
+        
+        break
+    
+    # Intervalo de ejecución
+    print("\n📅 INTERVALO DE EJECUCIÓN")
+    print("¿Cada cuántos minutos quieres que se ejecute el verificador?")
+    print("Opciones disponibles: 15, 30, 45, 60 minutos")
+    
+    while True:
+        interval_input = input("⏱️  Intervalo en minutos (recomendado: 30): ").strip()
+        
+        if not interval_input:
+            interval = 30
+            break
+        
+        try:
+            interval = int(interval_input)
+            if interval not in [15, 30, 45, 60]:
+                print("❌ Intervalo inválido. Opciones: 15, 30, 45, 60 minutos")
+                continue
+            break
+        except ValueError:
+            print("❌ Ingresa un número válido")
+    
+    print(f"\n✅ Horario configurado:")
+    print(f"   🌅 Inicio: {start_time}")
+    print(f"   🌙 Fin: {end_time}")
+    print(f"   ⏱️  Intervalo: cada {interval} minutos")
+    
+    return start_time, end_time, interval
+
 def get_user_credentials():
     """Obtener credenciales del usuario"""
     print("📝 PASO 1: Configuración de credenciales")
@@ -225,12 +309,12 @@ def ask_for_automation():
     """Preguntar si quiere automatización"""
     print("\n⚙️ PASO 4: Configuración de automatización")
     print("-" * 40)
-    print("¿Quieres que el verificador se ejecute automáticamente cada 30 minutos?")
-    print("Esto te permitirá recibir notificaciones inmediatas cuando cambien tus notas.")
+    print("¿Quieres que el verificador se ejecute automáticamente en un horario específico?")
+    print("Esto te permitirá recibir notificaciones cuando cambien tus notas.")
     print()
     
     while True:
-        response = input("👉 Ejecutar automáticamente cada 30 minutos? (s/n): ").strip().lower()
+        response = input("👉 Configurar automatización? (s/n): ").strip().lower()
         if response in ['s', 'si', 'sí', 'y', 'yes']:
             return True
         elif response in ['n', 'no']:
@@ -276,73 +360,128 @@ pause
         print(f"❌ Error al crear archivo batch: {e}")
         return None
 
-def add_to_task_scheduler(batch_path):
-    """Agregar tarea al programador de tareas de Windows"""
-    print("\n📅 Configurando tarea programada...")
+def create_execution_script(batch_path, start_time, end_time, interval):
+    """Crear script de ejecución temporal para tareas programadas (silencioso)"""
+    try:
+        script_dir = get_script_directory()
+        python_exe = sys.executable
+        script_path = os.path.join(script_dir, "grade_checker.py")
+        exec_script_path = os.path.join(script_dir, "ejecutor_temporal.bat")
+        
+        print(f"📂 Creando script de ejecución temporal en: {exec_script_path}")
+        
+        # Contenido del script que ejecuta el verificador hasta la hora de fin
+        # Usa pythonw.exe para ejecución silenciosa y redirige salida a NUL
+        exec_content = f'''@echo off
+setlocal enabledelayedexpansion
+
+:loop
+rem Obtener hora actual
+for /f "tokens=1-2 delims=:" %%a in ('time /t') do (
+    set current_time=%%a:%%b
+)
+
+rem Comparar con hora de fin
+if "!current_time!" geq "{end_time}" (
+    exit /b 0
+)
+
+rem Ejecutar verificador silenciosamente
+"{python_exe}" "{script_path}" >nul 2>&1
+
+rem Esperar el intervalo especificado (en segundos)
+timeout /t {interval * 60} /nobreak >nul 2>&1
+
+goto :loop
+'''
+        
+        with open(exec_script_path, 'w', encoding='utf-8') as f:
+            f.write(exec_content)
+        
+        print(f"✅ Script de ejecución temporal creado: {exec_script_path}")
+        return exec_script_path
+        
+    except Exception as e:
+        print(f"❌ Error al crear script de ejecución temporal: {e}")
+        return None
+
+def add_to_task_scheduler(batch_path, start_time, end_time, interval):
+    """Agregar tareas al programador de tareas de Windows"""
+    print("\n📅 Configurando tareas programadas...")
     print("-" * 40)
     
     try:
-        # Nombre de la tarea
-        task_name = "VerificadorNotasUNETI"
+        # Nombres de las tareas
+        trigger_task_name = "VerificadorNotasUNETI_Trigger"
+        execution_task_name = "VerificadorNotasUNETI_Execution"
         
         # Validar que el archivo batch existe
         if not os.path.exists(batch_path):
             print(f"❌ El archivo batch no existe: {batch_path}")
             return False
         
-        # Comando para crear la tarea programada
-        cmd = [
+        # Crear script de ejecución temporal
+        exec_script_path = create_execution_script(batch_path, start_time, end_time, interval)
+        if not exec_script_path:
+            return False
+        
+        print("⏳ Creando tarea trigger (disparador diario)...")
+        
+        # Comando para crear la tarea trigger que se ejecuta diariamente
+        trigger_cmd = [
             'schtasks', '/create',
-            '/tn', task_name,
-            '/tr', f'"{batch_path}"',
-            '/sc', 'daily',      # Tarea diaria
-            '/st', '08:00',      # Comienza a las 8:00 AM
-            '/ri', '30',         # Repetir cada 30 minutos
-            '/du', '840',        # Duración de 14 horas (8:00 AM a 10:00 PM)
-            '/f'                # Forzar creación si ya existe
+            '/tn', trigger_task_name,
+            '/tr', f'schtasks /run /tn {execution_task_name}',
+            '/sc', 'daily',
+            '/st', start_time,
+            '/f'
         ]
         
-        print("⏳ Creando tarea programada...")
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        trigger_result = subprocess.run(trigger_cmd, capture_output=True, text=True)
         
-        if result.returncode == 0:
-            print("✅ Tarea programada creada exitosamente!")
-            print(f"📋 Nombre de la tarea: {task_name}")
-            print("⏰ Se ejecutará diariamente de 8:00 AM a 10:00 PM, cada 30 minutos")
-            print("\nPara gestionar la tarea puedes:")
-            print("• Abrir 'Programador de tareas' en Windows")
-            print(f"• Buscar la tarea llamada '{task_name}'")
-            print("• Desde ahí puedes habilitarla, deshabilitarla o eliminarla")
-            return True
-        else:
-            print("❌ Error al crear la tarea programada")
-            print(f"Error: {result.stderr}")
-            print("\n⚠️  Intentando configuración alternativa...")
+        if trigger_result.returncode != 0:
+            print("❌ Error al crear la tarea trigger")
+            print(f"Error: {trigger_result.stderr}")
+            return False
+        
+        print("✅ Tarea trigger creada exitosamente!")
+        
+        print("⏳ Creando tarea de ejecución...")
+        
+        # Comando para crear la tarea de ejecución que se ejecuta cuando es disparada
+        execution_cmd = [
+            'schtasks', '/create',
+            '/tn', execution_task_name,
+            '/tr', f'"{exec_script_path}"',
+            '/sc', 'once',
+            '/st', start_time,
+            '/f'
+        ]
+        
+        execution_result = subprocess.run(execution_cmd, capture_output=True, text=True)
+        
+        if execution_result.returncode != 0:
+            print("❌ Error al crear la tarea de ejecución")
+            print(f"Error: {execution_result.stderr}")
             
-            # Configuración alternativa sin /du
-            alt_cmd = [
-                'schtasks', '/create',
-                '/tn', task_name,
-                '/tr', f'"{batch_path}"',
-                '/sc', 'minute',  # Ejecutar cada 30 minutos
-                '/mo', '30',
-                '/st', '08:00',   # Comenzar a las 8:00 AM
-                '/et', '22:00',   # Terminar a las 10:00 PM
-                '/f'
-            ]
-            
-            alt_result = subprocess.run(alt_cmd, capture_output=True, text=True)
-            if alt_result.returncode == 0:
-                print("✅ Configuración alternativa exitosa!")
-                print("⏰ Se ejecutará cada 30 minutos de 8:00 AM a 10:00 PM")
-                return True
-            else:
-                print("❌ Error en configuración alternativa")
-                print(f"Error: {alt_result.stderr}")
-                return False
-            
+            # Limpiar la tarea trigger si falló la de ejecución
+            subprocess.run(['schtasks', '/delete', '/tn', trigger_task_name, '/f'], 
+                         capture_output=True, text=True)
+            return False
+        
+        print("✅ Tarea de ejecución creada exitosamente!")
+        print(f"📋 Tarea trigger: {trigger_task_name}")
+        print(f"📋 Tarea de ejecución: {execution_task_name}")
+        print(f"⏰ Se ejecutará diariamente desde las {start_time} hasta las {end_time}")
+        print(f"⏱️  Intervalo: cada {interval} minutos")
+        print("\nPara gestionar las tareas puedes:")
+        print("• Abrir 'Programador de tareas' en Windows")
+        print(f"• Buscar las tareas que comienzan con 'VerificadorNotasUNETI'")
+        print("• Desde ahí puedes habilitarlas, deshabilitarlas o eliminarlas")
+        return True
+        
     except Exception as e:
-        print(f"❌ Error al configurar la tarea programada: {e}")
+        print(f"❌ Error al configurar las tareas programadas: {e}")
         return False
 
 def run_grade_checker():
@@ -366,8 +505,8 @@ def run_grade_checker():
         result = subprocess.run([sys.executable, script_path], 
                               capture_output=True, 
                               text=True, 
-                              encoding='utf-8',  # Specify UTF-8 encoding for text streams
-                              errors='replace') # Replace characters that can't be encoded/decoded
+                              encoding='utf-8',
+                              errors='replace')
         
         # Restaurar directorio original
         os.chdir(original_dir)
@@ -386,12 +525,8 @@ def run_grade_checker():
     except Exception as e:
         print(f"❌ Error al ejecutar el verificador: {e}")
         return False
-            
-    except Exception as e:
-        print(f"❌ Error al ejecutar el verificador: {e}")
-        return False
 
-def show_final_instructions(automation_enabled):
+def show_final_instructions(automation_enabled, start_time=None, end_time=None, interval=None):
     """Mostrar instrucciones finales"""
     print("\n🎉 ¡CONFIGURACIÓN COMPLETADA!")
     print("=" * 60)
@@ -402,9 +537,11 @@ def show_final_instructions(automation_enabled):
     print("• ✅ Script del verificador actualizado")
     print("• ✅ Verificación inicial completada")
     if automation_enabled:
-        print("• ✅ Tarea programada configurada (cada 30 minutos)")
+        print("• ✅ Tareas programadas configuradas")
+        print(f"  - Horario: {start_time} a {end_time}")
+        print(f"  - Intervalo: cada {interval} minutos")
     else:
-        print("• ⚠️  Tarea programada omitida (sin permisos de administrador)")
+        print("• ⚠️  Automatización omitida")
     print()
     print("🔒 RECORDATORIO DE SEGURIDAD:")
     print("• Tu token de API está almacenado en texto plano en 'grade_checker.py'")
@@ -414,6 +551,8 @@ def show_final_instructions(automation_enabled):
     print()
     print("📝 ARCHIVOS CREADOS:")
     print("• verificador_notas.bat - Para ejecutar manualmente")
+    if automation_enabled:
+        print("• ejecutor_temporal.bat - Script de ejecución temporal")
     print("• previous_grades.json - Datos de notas anteriores")
     print("• grade_history.txt - Historial de cambios")
     print("• grade_checker.py.backup - Respaldo del archivo original")
@@ -429,8 +568,9 @@ def show_final_instructions(automation_enabled):
     print("• Para ver el historial: abrir 'grade_history.txt'")
     if automation_enabled:
         print("• Para gestionar la automatización: buscar 'VerificadorNotasUNETI' en el Programador de tareas")
+        print("• Para detener la automatización: deshabilitar ambas tareas en el Programador de tareas")
     else:
-        print("• Para configurar automatización: ejecutar setup.bat como administrador")
+        print("• Para configurar automatización: ejecutar este configurador nuevamente")
     print()
     print("🆘 SOPORTE:")
     print("Si tienes problemas, revisa los archivos de log o contacta al creador del script.")
@@ -450,7 +590,7 @@ def main():
     print("🔒 ADVERTENCIA DE SEGURIDAD IMPORTANTE:")
     print("Este script almacenará tu token de API en texto plano en tu computadora.")
     print("Mantén estos archivos en un lugar seguro y no los compartas con nadie.")
-    print("Si alguien más accede a estos archivos, podría tener acceso copmleto a tu cuenta de UNETI.")
+    print("Si alguien más accede a estos archivos, podría tener acceso completo a tu cuenta de UNETI.")
     print("=" * 60)
     print()
     
@@ -497,20 +637,25 @@ def main():
         
         # Paso 4: Configurar automatización (si no se omite)
         automation_enabled = False
+        start_time = end_time = interval = None
+        
         if args.skip_automation:
-            print("\n⚠️  Omitiendo configuración de automatización (sin permisos de administrador)")
+            print("\n⚠️  Omitiendo configuración de automatización")
             automate = False
         else:
             automate = ask_for_automation()
         
         batch_path = None
         if automate:
+            # Obtener horario del usuario
+            start_time, end_time, interval = get_time_schedule()
+            
             batch_path = create_batch_file()
             if batch_path:
-                if add_to_task_scheduler(batch_path):
+                if add_to_task_scheduler(batch_path, start_time, end_time, interval):
                     automation_enabled = True
                 else:
-                    print("⚠️  La tarea programada no se pudo crear, pero puedes ejecutar manualmente.")
+                    print("⚠️  Las tareas programadas no se pudieron crear, pero puedes ejecutar manualmente.")
             else:
                 print("⚠️  No se pudo crear el archivo batch para la automatización.")
         else:
@@ -519,10 +664,11 @@ def main():
         
         # Paso 5: Ejecutar por primera vez
         if run_grade_checker():
-            show_final_instructions(automation_enabled)
+            show_final_instructions(automation_enabled, start_time, end_time, interval)
         else:
             print("⚠️  Hubo un problema en la primera ejecución, pero la configuración está completa.")
             print("Puedes intentar ejecutar 'verificador_notas.bat' manualmente.")
+            show_final_instructions(automation_enabled, start_time, end_time, interval)
         
     except KeyboardInterrupt:
         print("\n\n❌ Configuración cancelada por el usuario.")
