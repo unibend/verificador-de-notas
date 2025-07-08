@@ -290,17 +290,16 @@ def add_to_task_scheduler(batch_path):
             print(f"❌ El archivo batch no existe: {batch_path}")
             return False
         
-        # Comando para crear la tarea programada (sin shell=True)
-        # Removed '/ri', '30' as it's not applicable with /sc minute
+        # Comando para crear la tarea programada
         cmd = [
             'schtasks', '/create',
             '/tn', task_name,
             '/tr', f'"{batch_path}"',
-            '/sc', 'minute',
-            '/mo', '30',
-            '/st', '08:00',
-            '/et', '22:00',
-            '/f'  # Forzar creación si ya existe
+            '/sc', 'daily',      # Tarea diaria
+            '/st', '08:00',      # Comienza a las 8:00 AM
+            '/ri', '30',         # Repetir cada 30 minutos
+            '/du', '840',        # Duración de 14 horas (8:00 AM a 10:00 PM)
+            '/f'                # Forzar creación si ya existe
         ]
         
         print("⏳ Creando tarea programada...")
@@ -309,7 +308,7 @@ def add_to_task_scheduler(batch_path):
         if result.returncode == 0:
             print("✅ Tarea programada creada exitosamente!")
             print(f"📋 Nombre de la tarea: {task_name}")
-            print("⏰ Se ejecutará cada 30 minutos de 8:00 AM a 10:00 PM")
+            print("⏰ Se ejecutará diariamente de 8:00 AM a 10:00 PM, cada 30 minutos")
             print("\nPara gestionar la tarea puedes:")
             print("• Abrir 'Programador de tareas' en Windows")
             print(f"• Buscar la tarea llamada '{task_name}'")
@@ -318,11 +317,29 @@ def add_to_task_scheduler(batch_path):
         else:
             print("❌ Error al crear la tarea programada")
             print(f"Error: {result.stderr}")
-            return False
+            print("\n⚠️  Intentando configuración alternativa...")
             
-    except Exception as e:
-        print(f"❌ Error al configurar la tarea programada: {e}")
-        return False
+            # Configuración alternativa sin /du
+            alt_cmd = [
+                'schtasks', '/create',
+                '/tn', task_name,
+                '/tr', f'"{batch_path}"',
+                '/sc', 'minute',  # Ejecutar cada 30 minutos
+                '/mo', '30',
+                '/st', '08:00',   # Comenzar a las 8:00 AM
+                '/et', '22:00',   # Terminar a las 10:00 PM
+                '/f'
+            ]
+            
+            alt_result = subprocess.run(alt_cmd, capture_output=True, text=True)
+            if alt_result.returncode == 0:
+                print("✅ Configuración alternativa exitosa!")
+                print("⏰ Se ejecutará cada 30 minutos de 8:00 AM a 10:00 PM")
+                return True
+            else:
+                print("❌ Error en configuración alternativa")
+                print(f"Error: {alt_result.stderr}")
+                return False
             
     except Exception as e:
         print(f"❌ Error al configurar la tarea programada: {e}")
