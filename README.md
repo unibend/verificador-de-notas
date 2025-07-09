@@ -22,7 +22,7 @@ Este proyecto es una herramienta útil para los estudiantes de la UNETI que dese
 1. Ve a la página de [Releases](https://github.com/unibend/verificador-de-notas/releases) y descarga el archivo `.zip` de la última versión.
 2. Extrae todo el contenido del archivo `.zip` en una carpeta de tu elección.
 
-⚡ **Importante:** Una vez hayas configurado el verificador, **no debes mover la carpeta ni sus archivos a otra ubicación**, ya que esto hará que dejen de funcionar correctamente la automatización y las rutas de configuración.
+⚡ **Importante:** Una vez hayas configurado el verificador, **no debes mover la carpeta ni sus archivos a otra ubicación, ni cambiarles el nombre**, ya que esto hará que dejen de funcionar correctamente la automatización y las rutas de configuración. Si tienes que mover o cambiar el nombre de los archivos, asegúrate de hacerlo antes de configurar el programa.
 
 ### 🚀 Instalación Automática (Recomendada):
 
