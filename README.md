@@ -4,84 +4,191 @@
 
 ## 📝 Descripción
 
-Este proyecto es una herramienta útil para los estudiantes de la UNETI que desean monitorear sus calificaciones. El programa se conecta a tu cuenta de la universidad y verifica si hay cambios en tus notas.
+Este proyecto es una herramienta útil para los estudiantes de la UNETI que desean monitorear sus calificaciones. El programa se conecta a tu cuenta de la universidad y verifica si hay cambios en tus notas con un sistema de instalación completamente renovado y almacenamiento seguro de credenciales.
 
 ## ✨ Características principales
 
-- **Monitoreo Automático**: Verifica tu cuenta cada 30 minutos, desde las 8:00 AM hasta las 10:00 PM.
-- **Notificaciones Instantáneas**: Recibe una notificación en tu escritorio (a través de una ventana de diálogo en Windows, o notificaciones nativas en macOS/Linux) cada vez que una calificación cambie o se publique una nueva.
-- **Historial Detallado**: Mantiene un registro de todos los cambios de notas en un archivo de texto (`grade_history.txt`) para que puedas revisarlos en cualquier momento.
-- **Fácil de Usar**: Un proceso de configuración guiado te ayudará a ponerlo en marcha rápidamente.
+- **Monitoreo Automático**: Verifica tu cuenta cada 30 minutos (configurable), en el horario de tu elección.
+- **Notificaciones Instantáneas**: Recibe notificaciones en tu escritorio cuando una calificación cambie o se publique una nueva.
+- **Almacenamiento Seguro**: Las credenciales se almacenan de forma segura usando el gestor de credenciales de Windows.
+- **Ejecución Silenciosa**: Las tareas automáticas se ejecutan en segundo plano sin mostrar ventanas.
+- **Instalación Inteligente**: Proceso de configuración completamente automatizado con verificación de dependencias.
+- **Historial Detallado**: Mantiene un registro de todos los cambios de notas en `grade_history.txt`.
 
-## ⚙️ Cómo Usar
+## ⚙️ Instalación y Configuración
 
-Sigue estos sencillos pasos para instalar y ejecutar el verificador de notas:
-
-### Descarga:
+### 📥 Descarga:
 1. Ve a la página de [Releases](https://github.com/unibend/verificador-de-notas/releases) y descarga el archivo `.zip` de la última versión.
 2. Extrae todo el contenido del archivo `.zip` en una carpeta de tu elección.
 
-### Ejecución (Windows):
+### 🚀 Instalación Automática (Recomendada):
 
-#### Opción Recomendada (con automatización):
-1. Abre el menú Inicio y busca "PowerShell".
-2. Haz clic derecho en "Windows PowerShell" y selecciona "Ejecutar como administrador".
-3. En la ventana de PowerShell, navega a la carpeta del proyecto:
-   - Primero, encuentra la ruta completa de la carpeta donde extrajiste los archivos (puedes hacerlo abriendo la carpeta en el Explorador de Archivos y copiando la ruta desde la barra de direcciones).
-   - Luego escribe en PowerShell: `cd "ruta\completa\a\la\carpeta"` (reemplaza con tu ruta real, manteniendo las comillas).
-   - Ejemplo: `cd "C:\Users\TuUsuario\Documents\verificador-de-notas"`
-4. Una vez en la carpeta correcta, escribe `python run.py` y presiona Enter.
-5. El programa `setup.py` se iniciará automáticamente. Sigue las instrucciones en pantalla para configurar la automatización.
+#### Para Windows 10/11:
+1. **Abre PowerShell como administrador** (recomendado para automatización completa):
+   - Busca "PowerShell" en el menú Inicio
+   - Haz clic derecho y selecciona "Ejecutar como administrador"
+   - Navega a la carpeta: `cd "C:\ruta\a\la\carpeta\descargada"`
 
-#### Opción Alternativa (sin administrador):
-1. Abre la carpeta donde extrajiste los archivos.
-2. Haz clic derecho en un espacio vacío mientras mantienes presionada la tecla Shift.
-3. Selecciona "Abrir la ventana de PowerShell aquí".
-4. Escribe `python run.py` y presiona Enter.
-5. Sigue las instrucciones en pantalla. Nota: sin permisos de administrador, el programa no podrá configurar la ejecución automática.
+2. **Ejecuta el lanzador inteligente**:
+   ```powershell
+   python run.py
+   ```
 
-#### Opción con Terminal Windows (Windows 10/11):
-1. Abre la Terminal Windows (puedes buscarla en el menú Inicio).
-2. Navega a la carpeta del proyecto usando: `cd "ruta\completa\a\la\carpeta"`
-3. Ejecuta: `python run.py`
-4. Sigue las instrucciones en pantalla.
+3. **Sigue las instrucciones en pantalla**:
+   - El programa verificará automáticamente las dependencias
+   - Te guiará a través de la configuración paso a paso
+   - Instalará las dependencias necesarias si no están presentes
+   - Configurará la automatización (si tienes permisos de administrador)
 
-#### Opción Manual:
-Después de la instalación inicial, puedes ejecutar la aplicación manualmente en cualquier momento haciendo doble clic en el archivo `verificador_notas.bat` (este archivo se crea durante la instalación).
+#### Opciones de Instalación:
 
-## 💡 Funcionamiento Interno (Diseño)
+**Con permisos de administrador (recomendado):**
+- ✅ Instalación automática de dependencias
+- ✅ Configuración completa de tareas programadas
+- ✅ Ejecución automática en segundo plano
+- ✅ Modo silencioso (sin ventanas)
 
-El programa está diseñado para ser lo más sencillo y eficiente posible:
+**Sin permisos de administrador:**
+- ✅ Instalación manual de dependencias
+- ✅ Configuración básica
+- ⚠️ Ejecución manual únicamente
+- ⚠️ Sin automatización
 
-- **Credenciales y Token**: Al iniciar por primera vez, el `configurador.py` te pedirá tus credenciales de la UNETI (usuario y contraseña). Utilizará estas credenciales para obtener un "token de aplicación móvil" de los servidores de Moodle de la UNETI. Este token es esencial, ya que permite al programa acceder a tus datos académicos sin necesidad de que ingreses tu contraseña cada vez.
+## 🔧 Características del Nuevo Sistema
 
-- **Almacenamiento del Token**: El token obtenido se guarda en texto plano dentro del archivo `grade_checker.py`. Este archivo es el corazón del verificador.
+### 🛡️ Seguridad Mejorada:
+- **Almacenamiento Seguro**: Tu token de API se almacena de forma segura en el gestor de credenciales de Windows (keyring)
+- **Cifrado Automático**: Windows cifra automáticamente las credenciales almacenadas
+- **Sin Archivos de Texto Plano**: No se guardan credenciales en archivos de texto plano
+- **Gestión Centralizada**: Todas las credenciales se gestionan desde el Administrador de credenciales de Windows
 
-- **Verificación Periódica**: Cada 30 minutos (si la automatización está configurada), el `grade_checker.py` se ejecuta:
-  - Se conecta a los servidores de la UNETI usando tu token.
-  - Descarga tus calificaciones actuales para todas tus asignaturas.
-  - Compara estas calificaciones con las que guardó la última vez en el archivo `previous_grades.json`.
+### 🔄 Lanzador Inteligente (`run.py`):
+- **Verificación Automática**: Detecta el estado de la configuración automáticamente
+- **Instalación de Dependencias**: Instala automáticamente las librerías necesarias
+- **Gestión Completa**: Configurar, ejecutar, actualizar y desinstalar desde un solo lugar
+- **Detección de Permisos**: Detecta automáticamente si tienes permisos de administrador
+- **Información del Sistema**: Muestra información detallada sobre tu configuración
 
-- **Notificaciones**: Si detecta algún cambio (por ejemplo, una nueva nota publicada, una nota existente actualizada, o una nueva materia inscrita), el programa te enviará una notificación a tu escritorio. En Windows, esto aparecerá como una ventana de diálogo informativa.
+### 📋 Menú Principal:
+```
+🎯 OPCIONES DISPONIBLES:
+1. 🚀 Ejecutar verificador de notas
+2. ⚙️  Configurar/Reconfigurar  
+3. 📦 Instalar dependencias
+4. 🗑️  Desinstalar
+5. ❌ Salir
+```
 
-- **Registro de Historial**: Todos los cambios detectados, así como los resúmenes de verificación, se registran en el archivo `grade_history.txt`, proporcionando un historial completo de tus calificaciones.
+### 🔇 Modo Silencioso:
+- **Ejecución en Segundo Plano**: Las tareas automáticas no muestran ventanas
+- **Notificaciones Únicamente**: Solo verás las notificaciones cuando haya cambios
+- **Dos Archivos Batch**: `verificador_notas.bat` (manual con ventana) y `verificador_notas_silent.bat` (automático sin ventana)
 
-## ⚠️ Seguridad
+## 💡 Funcionamiento Interno
 
-Actualmente, tu token de API se almacena en texto plano dentro del archivo `grade_checker.py`. Esto significa que cualquiera que tenga acceso a tus archivos podría potencialmente acceder a tus datos académicos de la UNETI.
+### 🔐 Gestión de Credenciales:
+1. **Configuración Inicial**: El `configurador.py` solicita tus credenciales UNETI
+2. **Obtención de Token**: Se conecta a los servidores Moodle para obtener un token de API
+3. **Almacenamiento Seguro**: El token se almacena en el gestor de credenciales de Windows usando keyring
+4. **Archivo de Configuración**: Se crea un `config.json` con información básica (sin credenciales)
 
-**Recomendaciones de seguridad**:
-- **Protege tus archivos**: Asegúrate de que los archivos del verificador (`grade_checker.py`, `previous_grades.json`, `grade_history.txt`, `verificador_notas.bat`, etc.) estén almacenados en un lugar seguro en tu computadora, donde solo tú tengas acceso.
-- **No compartas**: Evita compartir esta carpeta o sus contenidos con otras personas.
-- **Cambio de contraseña**: Si alguna vez sospechas que tu token ha sido comprometido, cambia inmediatamente tu contraseña en el campus virtual de la UNETI. Esto invalidará el token anterior.
+### 📊 Verificación de Notas:
+- **Conexión Segura**: Utiliza el token almacenado para conectarse a UNETI
+- **Comparación Inteligente**: Compara las notas actuales con las anteriores en `previous_grades.json`
+- **Notificaciones Contextuales**: Muestra notificaciones detalladas sobre los cambios
+- **Historial Completo**: Registra todos los cambios en `grade_history.txt`
 
-Estoy considerando añadir medidas de seguridad adicionales en el futuro para proteger mejor el token.
+### ⏰ Automatización:
+- **Tareas Programadas**: Crea tareas en el Programador de tareas de Windows
+- **Horario Personalizable**: Configura el horario de funcionamiento (por defecto: 8:00 AM - 10:00 PM)
+- **Intervalos Ajustables**: Elige entre 15, 30, 45 o 60 minutos
+- **Ejecución Silenciosa**: Las tareas automáticas no muestran ventanas
+
+## 📁 Archivos Creados
+
+Después de la instalación, encontrarás estos archivos:
+
+```
+📂 Carpeta del verificador/
+├── 📄 config.json - Configuración básica (sin credenciales)
+├── 📄 previous_grades.json - Datos de notas anteriores
+├── 📄 grade_history.txt - Historial completo de cambios
+├── 📄 verificador_notas.bat - Ejecución manual (con ventana)
+├── 📄 verificador_notas_silent.bat - Ejecución automática (silenciosa)
+├── 🐍 run.py - Lanzador inteligente
+├── 🐍 configurador.py - Configurador del sistema
+├── 🐍 grade_checker.py - Verificador principal
+└── 🐍 uninstall.py - Desinstalador
+```
+
+## 🔧 Uso Diario
+
+### 🚀 Ejecución Manual:
+```bash
+# Usando el lanzador inteligente
+python run.py
+
+# Usando el archivo batch
+verificador_notas.bat
+```
+
+### 🔄 Reconfiguración:
+```bash
+python run.py
+# Seleccionar opción 2: Configurar/Reconfigurar
+```
+
+### 🗑️ Desinstalación:
+```bash
+python run.py
+# Seleccionar opción 4: Desinstalar
+```
+
+Alternativemente, puedes ejecutar el archivo ```uninstall.py``` directamente, con permisos de administrador.
+
+## 🛠️ Dependencias
+
+El sistema instalará automáticamente estas dependencias:
+
+- **requests**: Para conexiones HTTP a los servidores UNETI
+- **keyring**: Para almacenamiento seguro de credenciales
+
+## 🔒 Seguridad y Privacidad
+
+### ✅ Características de Seguridad:
+- **Cifrado por Windows**: Las credenciales se cifran automáticamente
+- **Gestión Centralizada**: Acceso a credenciales desde el Administrador de credenciales
+- **Sin Archivos Sensibles**: No se almacenan credenciales en archivos de texto
+- **Conexiones Seguras**: Todas las conexiones usan HTTPS con verificación SSL
+
+### 🔑 Gestión de Credenciales:
+- **Ubicación**: `Panel de Control > Administrador de credenciales > Credenciales de Windows`
+- **Servicio**: Buscar "UNETI-Grade-Checker"
+- **Eliminación**: Eliminar directamente desde el Administrador de credenciales
+- **Actualización**: Ejecutar el configurador nuevamente
+
+### ⚠️ Recomendaciones de Seguridad:
+- **Protege tu Carpeta**: Mantén los archivos en una ubicación segura
+- **Cambio de Contraseña**: Si cambias tu contraseña UNETI, reconfigura el verificador
+- **Acceso Limitado**: Solo tú debes tener acceso a la carpeta del verificador
+
+## 📱 Notificaciones
+
+Recibirás notificaciones automáticas cuando:
+- 🆕 Se publique una nueva calificación
+- 🔄 Se actualice una calificación existente
+- 📚 Se agregue una nueva materia
+- 📊 Se modifique el promedio de una materia
+
+
 
 ## 🤝 Soporte
 
-Este es un proyecto personal creado para mí y algunos compañeros. Si encuentras algún problema, por favor:
+Si encuentras problemas:
 
-- **Abre un "Issue" en GitHub**: Utiliza la sección de "Issues" de este repositorio para reportar errores o sugerir mejoras.
-- **Contáctame Directamente**: Si el problema es urgente o prefieres un contacto más directo, puedes contactarme a través de [cyclic-pogo-shack@duck.com](mailto:cyclic-pogo-shack@duck.com).
+- **Issues en GitHub**: Utiliza la sección de [Issues](https://github.com/unibend/verificador-de-notas/issues)
+- **Contacto directo**: [cyclic-pogo-shack@duck.com](mailto:cyclic-pogo-shack@duck.com)
 
-Agradezco cualquier comentario o contribución para mejorar este verificador.
+---
+
+**Nota**: Este proyecto está en constante desarrollo. Las nuevas versiones pueden incluir funcionalidades adicionales y mejoras de seguridad.

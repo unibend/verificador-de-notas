@@ -5,6 +5,7 @@ from datetime import datetime
 import hashlib
 import platform
 import sys
+import getpass
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
@@ -23,21 +24,101 @@ try:
         NOTIFICATIONS_AVAILABLE = True
 except ImportError:
     NOTIFICATIONS_AVAILABLE = False
-    print("⚠️  Desktop notifications not available.")
+    print("⚠️  Notificaciones de escritorio no disponibles.")
+
+# Keyring support for secure token storage
+try:
+    import keyring
+    KEYRING_AVAILABLE = True
+except ImportError:
+    KEYRING_AVAILABLE = False
+    print("⚠️  Keyring no disponible. Almacenamiento seguro de tokens deshabilitado.")
 
 class MoodleGradeChecker:
-    def __init__(self, base_url, token, max_grade=20):
+    def __init__(self, base_url, token=None, max_grade=20):
         self.base_url = base_url
-        self.token = token
         self.max_grade = max_grade  # Maximum grade for the entire course
         self.api_url = f"{base_url}/webservice/rest/server.php"
         self.grades_file = "previous_grades.json"
         self.history_file = "grade_history.txt"
+        self.config_file = "config.json"
+        self.service_name = "UNETI-Grade-Checker"
+        
+        # Get token from keyring or use provided token
+        if token:
+            self.token = token
+        else:
+            self.token = self.get_token_from_keyring()
+    
+    def load_config(self):
+        """Load configuration from config.json"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return None
+        except Exception as e:
+            print(f"❌ Error al cargar configuración: {e}")
+            return None
+    
+    def get_token_from_keyring(self):
+        """Retrieve API token from keyring using config file"""
+        if not KEYRING_AVAILABLE:
+            print("❌ Keyring no disponible. No se puede recuperar el token almacenado.")
+            return None
+        
+        try:
+            # Load username from config file
+            config = self.load_config()
+            if not config or 'username' not in config:
+                print("❌ No se encontró configuración.")
+                print("Por favor, ejecuta el configurador primero para configurar tus credenciales.")
+                return None
+            
+            username = config['username']
+            service_name = config.get('service_name', self.service_name)
+            
+            token = keyring.get_password(service_name, username)
+            if not token:
+                print(f"❌ No se encontró token para el usuario: {username}")
+                print("Por favor, ejecuta el configurador para configurar tus credenciales.")
+                return None
+            
+            print(f"✅ Token recuperado del keyring para el usuario: {username}")
+            return token
+            
+        except Exception as e:
+            print(f"❌ Error al recuperar token del keyring: {e}")
+            return None
+    
+    def get_stored_username(self):
+        """Get the stored username from config file"""
+        config = self.load_config()
+        if config and 'username' in config:
+            return config['username']
+        return None
+    
+    def validate_token(self):
+        """Validate that the token works"""
+        if not self.token:
+            return False
+        
+        try:
+            user_info = self.get_user_info()
+            if user_info and 'userid' in user_info:
+                print(f"✅ Validación de token exitosa. ID de usuario: {user_info['userid']}")
+                return True
+            else:
+                print("❌ Validación de token falló.")
+                return False
+        except Exception as e:
+            print(f"❌ Error al validar token: {e}")
+            return False
     
     def send_notification(self, title, message, grade_details=None):
         """Send a desktop notification or dialog"""
         if not NOTIFICATIONS_AVAILABLE:
-            print(f"🔔 Notification: {title} - {message}")
+            print(f"🔔 Notificación: {title} - {message}")
             return
         
         try:
@@ -53,21 +134,21 @@ class MoodleGradeChecker:
                     # Use MB_OK for a general notification sound
                     winsound.MessageBeep(winsound.MB_OK) 
                 except Exception as sound_e:
-                    print(f"Warning: Could not play sound: {sound_e}")
+                    print(f"Advertencia: No se pudo reproducir sonido: {sound_e}")
                 
                 # Show dialog box
                 if grade_details:
-                    course_name = grade_details.get('course', 'Unknown Course')
-                    assignment_name = grade_details.get('assignment', 'Unknown Assignment')
-                    new_grade = grade_details.get('new_grade', 'Unknown')
+                    course_name = grade_details.get('course', 'Curso Desconocido')
+                    assignment_name = grade_details.get('assignment', 'Tarea Desconocida')
+                    new_grade = grade_details.get('new_grade', 'Desconocido')
                     old_grade = grade_details.get('old_grade', None)
                     
                     if old_grade:
-                        dialog_message = f"Your grade in '{course_name}' for assignment '{assignment_name}' has been updated.\n\nPrevious grade: {old_grade}\nNew grade: {new_grade}"
+                        dialog_message = f"Tu calificación en '{course_name}' para la tarea '{assignment_name}' ha sido actualizada.\n\nCalificación anterior: {old_grade}\nNueva calificación: {new_grade}"
                     else:
-                        dialog_message = f"You have received a new grade in '{course_name}' for assignment '{assignment_name}'.\n\nYour grade: {new_grade}"
+                        dialog_message = f"Has recibido una nueva calificación en '{course_name}' para la tarea '{assignment_name}'.\n\nTu calificación: {new_grade}"
                     
-                    messagebox.showinfo("🎓 Grade Update", dialog_message)
+                    messagebox.showinfo("🎓 Actualización de Calificación", dialog_message)
                 else:
                     messagebox.showinfo(title, message)
                 
@@ -84,11 +165,15 @@ class MoodleGradeChecker:
                     message
                 ], check=False)
         except Exception as e:
-            print(f"Failed to send notification: {e}")
-            print(f"🔔 Notification: {title} - {message}")
+            print(f"Error al enviar notificación: {e}")
+            print(f"🔔 Notificación: {title} - {message}")
     
     def make_api_call(self, function, params=None):
         """Make a call to Moodle API"""
+        if not self.token:
+            print("❌ No hay token de API disponible")
+            return None
+        
         data = {
             'wstoken': self.token,
             'wsfunction': function,
@@ -98,7 +183,7 @@ class MoodleGradeChecker:
         if params:
             data.update(params)
         
-        print(f"  Making API call: {function}")
+        print(f"  Realizando llamada a API: {function}")
         
         try:
             response = requests.post(self.api_url, data=data, timeout=30)
@@ -108,20 +193,20 @@ class MoodleGradeChecker:
             
             # Check for Moodle API errors
             if isinstance(result, dict) and 'exception' in result:
-                print(f"  Moodle API Error: {result.get('message', 'Unknown error')}")
+                print(f"  Error de API de Moodle: {result.get('message', 'Error desconocido')}")
                 return None
             
-            print(f"  API call successful")
+            print(f"  Llamada a API exitosa")
             return result
             
         except requests.exceptions.Timeout:
-            print(f"  API call timed out after 30 seconds")
+            print(f"  Tiempo de espera agotado después de 30 segundos")
             return None
         except requests.exceptions.RequestException as e:
-            print(f"  API request failed: {e}")
+            print(f"  Solicitud de API falló: {e}")
             return None
         except json.JSONDecodeError as e:
-            print(f"  Failed to parse JSON response: {e}")
+            print(f"  Error al analizar respuesta JSON: {e}")
             return None
     
     def get_user_info(self):
@@ -160,7 +245,7 @@ class MoodleGradeChecker:
                     
                     # Skip items with null/empty itemname or 'none' (these are course totals)
                     if not item_name or item_name.lower() in ['none', 'null', '']:
-                        print(f"    Skipping course total item: {item_name}")
+                        print(f"    Omitiendo elemento total del curso: {item_name}")
                         continue
                     
                     # Extract relevant information
@@ -168,7 +253,7 @@ class MoodleGradeChecker:
                         'id': item.get('id'),
                         'itemname': item_name,
                         'graderaw': item.get('graderaw'),
-                        'gradeformatted': item.get('gradeformatted', 'No grade'),
+                        'gradeformatted': item.get('gradeformatted', 'Sin calificación'),
                         'grademax': item.get('grademax'),
                         'grademin': item.get('grademin'),
                         'percentageformatted': item.get('percentageformatted', 'N/A'),
@@ -202,20 +287,20 @@ class MoodleGradeChecker:
     
     def get_all_grades(self):
         """Get all grades from all enrolled courses"""
-        print("  Getting enrolled courses...")
+        print("  Obteniendo cursos inscritos...")
         courses = self.get_enrolled_courses()
         if not courses:
-            print("  Failed to get courses")
+            print("  Error al obtener cursos")
             return None
         
-        print(f"  Found {len(courses)} enrolled courses")
+        print(f"  Encontrados {len(courses)} cursos inscritos")
         all_grades = {}
         
         for i, course in enumerate(courses, 1):
             course_id = course['id']
             course_name = course['fullname']
             
-            print(f"  Processing course {i}/{len(courses)}: {course_name}")
+            print(f"  Procesando curso {i}/{len(courses)}: {course_name}")
             
             grades_data = self.get_grades_for_course(course_id)
             grade_items = self.extract_grade_items(grades_data)
@@ -232,13 +317,13 @@ class MoodleGradeChecker:
                     'total_possible': possible,
                     'graded_assignments': graded_count
                 }
-                print(f"    Retrieved {len(grade_items)} grade items ({graded_count} graded)")
+                print(f"    Recuperados {len(grade_items)} elementos de calificación ({graded_count} calificados)")
                 if graded_count > 0:
-                    print(f"    Course grade: {achieved:.2f}/{possible} ({percentage:.2f}%)")
+                    print(f"    Calificación del curso: {achieved:.2f}/{possible} ({percentage:.2f}%)")
             else:
-                print(f"    No grades found for this course")
+                print(f"    No se encontraron calificaciones para este curso")
         
-        print(f"  Total courses with grades: {len(all_grades)}")
+        print(f"  Total de cursos con calificaciones: {len(all_grades)}")
         return all_grades
     
     def load_previous_grades(self):
@@ -264,10 +349,10 @@ class MoodleGradeChecker:
         if not os.path.exists(self.history_file):
             with open(self.history_file, 'w', encoding='utf-8') as f:
                 f.write("=" * 80 + "\n")
-                f.write("MOODLE GRADE HISTORY LOG\n")
+                f.write("REGISTRO DE HISTORIAL DE CALIFICACIONES MOODLE\n")
                 f.write("=" * 80 + "\n")
-                f.write(f"Log started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"Maximum course grade: {self.max_grade}\n")
+                f.write(f"Registro iniciado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"Calificación máxima del curso: {self.max_grade}\n")
                 f.write("=" * 80 + "\n\n")
     
     def log_to_history(self, message, course_name=None, grade_item=None, old_grade=None, new_grade=None):
@@ -280,27 +365,27 @@ class MoodleGradeChecker:
             f.write(f"[{timestamp}] {message}\n")
             
             if course_name:
-                f.write(f"    Course: {course_name}\n")
+                f.write(f"    Curso: {course_name}\n")
             
             if grade_item:
-                f.write(f"    Assignment: {grade_item}\n")
+                f.write(f"    Tarea: {grade_item}\n")
             
             if old_grade is not None and new_grade is not None:
-                f.write(f"    Grade Change: {old_grade} → {new_grade}\n")
+                f.write(f"    Cambio de Calificación: {old_grade} → {new_grade}\n")
             elif new_grade is not None:
-                f.write(f"    Grade: {new_grade}\n")
+                f.write(f"    Calificación: {new_grade}\n")
             
             f.write("\n")
     
     def format_grade_display(self, grade_item):
         """Format grade for display"""
-        item_name = grade_item.get('itemname', 'Unknown')
+        item_name = grade_item.get('itemname', 'Desconocido')
         grade_raw = grade_item.get('graderaw')
         
         if grade_raw is not None:
-            return f"{item_name}: {grade_raw} points"
+            return f"{item_name}: {grade_raw} puntos"
         else:
-            return f"{item_name}: No grade"
+            return f"{item_name}: Sin calificación"
     
     def log_course_summary(self, course_name, course_data):
         """Log a complete course summary to history"""
@@ -310,7 +395,7 @@ class MoodleGradeChecker:
         grade_items = course_data.get('grades', [])
         
         with open(self.history_file, 'a', encoding='utf-8') as f:
-            f.write(f"[{timestamp}] COURSE SUMMARY: {course_name}\n")
+            f.write(f"[{timestamp}] RESUMEN DEL CURSO: {course_name}\n")
             f.write("-" * 60 + "\n")
             
             # Course statistics
@@ -319,13 +404,13 @@ class MoodleGradeChecker:
             possible = course_data.get('total_possible', 0)
             graded_count = course_data.get('graded_assignments', 0)
             
-            f.write(f"    Course Grade: {achieved:.2f}/{possible} ({percentage:.2f}%)\n")
-            f.write(f"    Graded Assignments: {graded_count}/{len(grade_items)}\n")
-            f.write(f"    Maximum Course Grade: {self.max_grade}\n")
+            f.write(f"    Calificación del Curso: {achieved:.2f}/{possible} ({percentage:.2f}%)\n")
+            f.write(f"    Tareas Calificadas: {graded_count}/{len(grade_items)}\n")
+            f.write(f"    Calificación Máxima del Curso: {self.max_grade}\n")
             f.write("-" * 60 + "\n")
             
             if not grade_items:
-                f.write("    No grade items found\n")
+                f.write("    No se encontraron elementos de calificación\n")
             else:
                 for item in grade_items:
                     f.write(f"    {self.format_grade_display(item)}\n")
@@ -339,10 +424,10 @@ class MoodleGradeChecker:
         
         if not previous_grades or 'grades' not in previous_grades:
             # First run - log all courses and grades
-            self.log_to_history("FIRST RUN - Establishing baseline grades")
+            self.log_to_history("PRIMERA EJECUCIÓN - Estableciendo calificaciones base")
             
             for course_name, course_data in current_grades.items():
-                self.log_to_history("New course discovered", course_name=course_name)
+                self.log_to_history("Nuevo curso descubierto", course_name=course_name)
                 self.log_course_summary(course_name, course_data)
                 
                 graded_count = course_data.get('graded_assignments', 0)
@@ -350,9 +435,9 @@ class MoodleGradeChecker:
                 achieved = course_data.get('total_achieved', 0)
                 
                 if graded_count > 0:
-                    changes.append(f"Baseline established for {course_name} ({achieved:.2f}/{self.max_grade}, {percentage:.2f}%)")
+                    changes.append(f"Línea base establecida para {course_name} ({achieved:.2f}/{self.max_grade}, {percentage:.2f}%)")
                 else:
-                    changes.append(f"Baseline established for {course_name} (no grades yet)")
+                    changes.append(f"Línea base establecida para {course_name} (sin calificaciones aún)")
             
             return changes, notification_messages
         
@@ -364,9 +449,9 @@ class MoodleGradeChecker:
             
             if course_name not in prev_grades:
                 # New course
-                changes.append(f"New course detected: {course_name}")
-                notification_messages.append(f"🎓 New course enrolled: {course_name}")
-                self.log_to_history("New course enrolled", course_name=course_name)
+                changes.append(f"Nuevo curso detectado: {course_name}")
+                notification_messages.append(f"🎓 Nuevo curso inscrito: {course_name}")
+                self.log_to_history("Nuevo curso inscrito", course_name=course_name)
                 self.log_course_summary(course_name, course_data)
                 continue
             
@@ -380,7 +465,7 @@ class MoodleGradeChecker:
             grade_changes_in_course = []
             
             for current_item in current_items:
-                item_name = current_item.get('itemname', 'Unknown')
+                item_name = current_item.get('itemname', 'Desconocido')
                 item_id = current_item.get('id')
                 current_grade = current_item.get('graderaw')
                 
@@ -395,10 +480,10 @@ class MoodleGradeChecker:
                 if previous_item:
                     prev_grade = previous_item.get('graderaw')
                     if current_grade != prev_grade:
-                        prev_display = f"{prev_grade} points" if prev_grade is not None else "No grade"
-                        current_display = f"{current_grade} points" if current_grade is not None else "No grade"
+                        prev_display = f"{prev_grade} puntos" if prev_grade is not None else "Sin calificación"
+                        current_display = f"{current_grade} puntos" if current_grade is not None else "Sin calificación"
                         
-                        change_msg = f"Grade changed in {course_name} - {item_name}: {prev_display} → {current_display}"
+                        change_msg = f"Calificación cambiada en {course_name} - {item_name}: {prev_display} → {current_display}"
                         changes.append(change_msg)
                         grade_changes_in_course.append(f"{item_name}: {prev_display} → {current_display}")
                         
@@ -409,9 +494,9 @@ class MoodleGradeChecker:
                             'old_grade': prev_display,
                             'new_grade': current_display
                         }
-                        self.send_notification("🎓 Grade Update", "", grade_details)
+                        self.send_notification("🎓 Actualización de Calificación", "", grade_details)
                         
-                        self.log_to_history("Grade updated", 
+                        self.log_to_history("Calificación actualizada", 
                                           course_name=course_name, 
                                           grade_item=item_name,
                                           old_grade=prev_display, 
@@ -419,10 +504,10 @@ class MoodleGradeChecker:
                 else:
                     # New grade item
                     if current_grade is not None:  # Only notify if there's actually a grade
-                        grade_display = f"{current_grade} points"
-                        change_msg = f"New grade item in {course_name}: {item_name} - {grade_display}"
+                        grade_display = f"{current_grade} puntos"
+                        change_msg = f"Nuevo elemento de calificación en {course_name}: {item_name} - {grade_display}"
                         changes.append(change_msg)
-                        grade_changes_in_course.append(f"New: {item_name} - {grade_display}")
+                        grade_changes_in_course.append(f"Nuevo: {item_name} - {grade_display}")
                         
                         # Send individual notification for this new grade
                         grade_details = {
@@ -431,9 +516,9 @@ class MoodleGradeChecker:
                             'old_grade': None,
                             'new_grade': grade_display
                         }
-                        self.send_notification("🎓 New Grade", "", grade_details)
+                        self.send_notification("🎓 Nueva Calificación", "", grade_details)
                         
-                        self.log_to_history("New grade item", 
+                        self.log_to_history("Nuevo elemento de calificación", 
                                           course_name=course_name, 
                                           grade_item=item_name,
                                           new_grade=grade_display)
@@ -442,18 +527,18 @@ class MoodleGradeChecker:
             if abs(current_achieved - prev_achieved) > 0.01:  # More than 0.01 point change
                 grade_change = current_achieved - prev_achieved
                 sign = "+" if grade_change > 0 else ""
-                changes.append(f"Total grade changed for {course_name}: {prev_achieved:.2f} → {current_achieved:.2f} ({sign}{grade_change:.2f} points)")
+                changes.append(f"Calificación total cambiada para {course_name}: {prev_achieved:.2f} → {current_achieved:.2f} ({sign}{grade_change:.2f} puntos)")
                 
-                self.log_to_history(f"Course total updated: {prev_achieved:.2f} → {current_achieved:.2f} points", 
+                self.log_to_history(f"Total del curso actualizado: {prev_achieved:.2f} → {current_achieved:.2f} puntos", 
                                   course_name=course_name)
             
             # Check for percentage changes
             if abs(current_percentage - prev_percentage) > 0.01:  # More than 0.01% change
                 percentage_change = current_percentage - prev_percentage
                 sign = "+" if percentage_change > 0 else ""
-                changes.append(f"Course percentage changed for {course_name}: {prev_percentage:.2f}% → {current_percentage:.2f}% ({sign}{percentage_change:.2f}%)")
+                changes.append(f"Porcentaje del curso cambiado para {course_name}: {prev_percentage:.2f}% → {current_percentage:.2f}% ({sign}{percentage_change:.2f}%)")
                 
-                self.log_to_history(f"Course percentage updated: {prev_percentage:.2f}% → {current_percentage:.2f}%", 
+                self.log_to_history(f"Porcentaje del curso actualizado: {prev_percentage:.2f}% → {current_percentage:.2f}%", 
                                   course_name=course_name)
             
             # Create summary notification for course if there were changes
@@ -464,38 +549,47 @@ class MoodleGradeChecker:
         # Check for courses that were dropped
         for course_name in prev_grades:
             if course_name not in current_grades:
-                changes.append(f"Course no longer enrolled: {course_name}")
-                self.log_to_history("Course dropped", course_name=course_name)
+                changes.append(f"Curso ya no inscrito: {course_name}")
+                self.log_to_history("Curso abandonado", course_name=course_name)
         
         return changes, notification_messages
     
     def check_grades(self):
         """Main function to check for grade changes"""
-        print("Checking grades...")
+        print("Verificando calificaciones...")
         
-        # Log the check attempt
-        self.log_to_history("Grade check initiated")
-        
-        # Get current grades
-        print("Retrieving current grades from Moodle...")
-        current_grades = self.get_all_grades()
-        if not current_grades:
-            print("❌ Failed to retrieve grades")
-            self.log_to_history("ERROR: Failed to retrieve grades from Moodle")
+        # Validate token first
+        if not self.validate_token():
+            print("❌ Token de API inválido o faltante.")
+            if KEYRING_AVAILABLE:
+                print("Por favor, ejecuta el configurador para configurar tus credenciales.")
+            else:
+                print("Por favor, instala keyring y ejecuta el configurador: pip install keyring")
             return
         
-        print("✅ Successfully retrieved grades")
+        # Log the check attempt
+        self.log_to_history("Verificación de calificaciones iniciada")
+        
+        # Get current grades
+        print("Recuperando calificaciones actuales de Moodle...")
+        current_grades = self.get_all_grades()
+        if not current_grades:
+            print("❌ Error al recuperar calificaciones")
+            self.log_to_history("ERROR: Error al recuperar calificaciones de Moodle")
+            return
+        
+        print("✅ Calificaciones recuperadas exitosamente")
         
         # Load previous grades
-        print("Loading previous grades...")
+        print("Cargando calificaciones anteriores...")
         previous_grades = self.load_previous_grades()
         
         # Compare grades
-        print("Comparing grades...")
+        print("Comparando calificaciones...")
         changes, notification_messages = self.compare_grades(current_grades, previous_grades)
         
         # Save current grades
-        print("Saving current grades...")
+        print("Guardando calificaciones actuales...")
         self.save_current_grades(current_grades)
         
         # Send notifications if there are changes - now handled individually
@@ -504,29 +598,29 @@ class MoodleGradeChecker:
         # Report changes
         print("\n" + "="*70)
         if changes:
-            print(f"🎯 Found {len(changes)} grade changes:")
+            print(f"🎯 Se encontraron {len(changes)} cambios en las calificaciones:")
             for change in changes:
                 print(f"  • {change}")
             
-            self.log_to_history(f"Grade check completed - {len(changes)} changes detected")
+            self.log_to_history(f"Verificación de calificaciones completada - {len(changes)} cambios detectados")
         else:
-            print("✅ No grade changes detected")
-            self.log_to_history("Grade check completed - No changes detected")
+            print("✅ No se detectaron cambios en las calificaciones")
+            self.log_to_history("Verificación de calificaciones completada - No se detectaron cambios")
         
         print("="*70)
-        print(f"Last checked: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"History log: {self.history_file}")
-        print(f"Data file: {self.grades_file}")
+        print(f"Última verificación: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Registro de historial: {self.history_file}")
+        print(f"Archivo de datos: {self.grades_file}")
         
         # Show summary
         total_courses = len(current_grades)
         total_items = sum(len(course['grades']) for course in current_grades.values())
         graded_items = sum(course.get('graded_assignments', 0) for course in current_grades.values())
         
-        print(f"Monitoring: {total_courses} courses, {total_items} grade items ({graded_items} with grades)")
+        print(f"Monitoreando: {total_courses} cursos, {total_items} elementos de calificación ({graded_items} con calificaciones)")
         
         # Show course grades (corrected calculation)
-        print("\nCourse Progress:")
+        print("\nProgreso de Cursos:")
         for course_name, course_data in current_grades.items():
             percentage = course_data.get('percentage', 0)
             achieved = course_data.get('total_achieved', 0)
@@ -535,15 +629,21 @@ class MoodleGradeChecker:
             total_assignments = len(course_data.get('grades', []))
             
             print(f"  📚 {course_name}")
-            print(f"      Grade: {achieved:.2f}/{possible} ({percentage:.2f}%)")
-            print(f"      Assignments: {graded_count}/{total_assignments} graded")
+            print(f"      Calificación: {achieved:.2f}/{possible} ({percentage:.2f}%)")
+            print(f"      Tareas: {graded_count}/{total_assignments} calificadas")
 
 # Usage example
 if __name__ == "__main__":
-    # You'll need to replace these with your actual values
+    # Moodle URL - this should remain constant
     MOODLE_URL = "https://www.uneti.edu.ve/campus/"
-    API_TOKEN = "placeholder"
     
-    # Create checker with max grade of 20 (for entire course, not per assignment)
-    checker = MoodleGradeChecker(MOODLE_URL, API_TOKEN, max_grade=20)
-    checker.check_grades()
+    # Create checker - token will be retrieved from keyring
+    checker = MoodleGradeChecker(MOODLE_URL, max_grade=20)
+    
+    # Check if we have a valid token
+    if checker.token:
+        checker.check_grades()
+    else:
+        print("❌ No hay token de API disponible.")
+        print("Por favor, ejecuta el configurador primero para configurar tus credenciales.")
+        print("Ejecuta: python configurador.py")

@@ -2,6 +2,7 @@ import subprocess
 import os
 import platform
 import sys
+import json
 
 def print_banner():
     """Mostrar banner del desinstalador"""
@@ -9,9 +10,115 @@ def print_banner():
     print("🗑️  DESINSTALADOR DE VERIFICADOR DE NOTAS UNETI")
     print("=" * 60)
     print("Este programa eliminará las tareas programadas del verificador")
-    print("de notas y opcionalmente los archivos relacionados.")
+    print("de notas, las credenciales almacenadas y opcionalmente los archivos relacionados.")
     print("=" * 60)
     print()
+
+def check_keyring_available():
+    """Verificar si keyring está disponible"""
+    try:
+        import keyring
+        return True
+    except ImportError:
+        return False
+
+def get_stored_username():
+    """Obtener el nombre de usuario almacenado en config.json"""
+    try:
+        script_dir = get_script_directory()
+        config_path = os.path.join(script_dir, "config.json")
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return config.get('username')
+        return None
+    except Exception as e:
+        print(f"⚠️ Error al leer configuración: {e}")
+        return None
+
+def remove_stored_credentials():
+    """Eliminar credenciales almacenadas en keyring"""
+    print("\n🔑 ELIMINANDO CREDENCIALES ALMACENADAS")
+    print("-" * 40)
+    
+    if not check_keyring_available():
+        print("ℹ️  La librería keyring no está disponible.")
+        print("Las credenciales no se pueden eliminar automáticamente.")
+        print("Si tienes credenciales almacenadas, elimínalas manualmente desde:")
+        print("• Panel de Control > Administrador de credenciales")
+        print("• Buscar 'UNETI-Grade-Checker'")
+        return True
+    
+    try:
+        import keyring
+        
+        # Intentar obtener username desde config
+        username = get_stored_username()
+        
+        if not username:
+            print("⚠️  No se encontró el nombre de usuario en la configuración.")
+            print("¿Quieres intentar eliminar las credenciales manualmente?")
+            print("Esto requiere que ingreses tu nombre de usuario.")
+            
+            while True:
+                response = input("👉 Intentar eliminación manual? (s/n): ").strip().lower()
+                if response in ['s', 'si', 'sí', 'y', 'yes']:
+                    username = input("👤 Ingresa tu nombre de usuario: ").strip()
+                    if username:
+                        break
+                    else:
+                        print("❌ El nombre de usuario no puede estar vacío.")
+                        continue
+                elif response in ['n', 'no']:
+                    print("ℹ️  Eliminación de credenciales omitida.")
+                    print("Para eliminar manualmente:")
+                    print("• Panel de Control > Administrador de credenciales")
+                    print("• Buscar 'UNETI-Grade-Checker'")
+                    return True
+                else:
+                    print("Por favor, responde 's' para sí o 'n' para no.")
+        
+        service_name = "UNETI-Grade-Checker"
+        
+        print(f"🔄 Eliminando credenciales para usuario: {username}")
+        print(f"🔄 Servicio: {service_name}")
+        
+        # Intentar eliminar las credenciales
+        try:
+            # Primero verificar si existen las credenciales
+            stored_token = keyring.get_password(service_name, username)
+            
+            if stored_token:
+                # Eliminar las credenciales
+                keyring.delete_password(service_name, username)
+                print("✅ Credenciales eliminadas exitosamente del gestor de credenciales del sistema")
+                print("🔒 El token de API ya no está almacenado en keyring")
+                return True
+            else:
+                print("ℹ️  No se encontraron credenciales almacenadas para este usuario.")
+                return True
+                
+        except keyring.errors.PasswordDeleteError:
+            print("ℹ️  No se encontraron credenciales almacenadas.")
+            return True
+        except Exception as e:
+            print(f"❌ Error al eliminar credenciales: {e}")
+            print("Puedes eliminarlas manualmente desde:")
+            print("• Panel de Control > Administrador de credenciales")
+            print("• Buscar 'UNETI-Grade-Checker'")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error al acceder al gestor de credenciales: {e}")
+        return False
+
+def get_script_directory():
+    """Obtener el directorio donde está ubicado el script"""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
 
 def check_task_exists(task_name):
     """Verificar si una tarea programada existe"""
@@ -24,7 +131,7 @@ def check_task_exists(task_name):
 
 def remove_scheduled_tasks():
     """Eliminar las tareas programadas"""
-    print("🔄 Eliminando tareas programadas...")
+    print("\n🔄 ELIMINANDO TAREAS PROGRAMADAS")
     print("-" * 40)
     
     # Lista de tareas a eliminar (nombres antiguos y nuevos)
@@ -98,12 +205,13 @@ def validate_file_path(filename):
 
 def ask_delete_files():
     """Preguntar si quiere eliminar archivos relacionados"""
-    print("\n📁 Gestión de archivos")
+    print("\n📁 GESTIÓN DE ARCHIVOS")
     print("-" * 40)
     print("¿Qué archivos quieres eliminar?")
     print()
     
     files_to_check = [
+        ("config.json", "Configuración de usuario y credenciales"),
         ("verificador_notas.bat", "Archivo batch para ejecución manual"),
         ("previous_grades.json", "Datos de notas anteriores guardadas"),
         ("grade_history.txt", "Historial completo de cambios de notas"),
@@ -137,7 +245,7 @@ def delete_files(files_to_delete):
         print("ℹ️  No se seleccionaron archivos para eliminar.")
         return True
     
-    print(f"🗑️  Eliminando {len(files_to_delete)} archivo(s)...")
+    print(f"\n🗑️  ELIMINANDO {len(files_to_delete)} ARCHIVO(S)")
     print("-" * 40)
     
     success = True
@@ -159,7 +267,7 @@ def delete_files(files_to_delete):
 
 def reset_api_token():
     """Preguntar si quiere resetear el token de API en el script"""
-    print("\n🔧 Resetear configuración")
+    print("\n🔧 RESETEAR CONFIGURACIÓN DEL SCRIPT")
     print("-" * 40)
     
     script_name = "grade_checker.py"
@@ -170,10 +278,12 @@ def reset_api_token():
     
     print("¿Quieres resetear el token de API en el script del verificador?")
     print("(Esto volverá a poner 'placeholder' en lugar de tu token actual)")
+    print("NOTA: Con el nuevo sistema, las credenciales se almacenan en keyring,")
+    print("por lo que este paso es opcional y principalmente para limpieza.")
     print()
     
     while True:
-        response = input("👉 Resetear token de API? (s/n): ").strip().lower()
+        response = input("👉 Resetear token de API en el script? (s/n): ").strip().lower()
         if response in ['s', 'si', 'sí', 'y', 'yes']:
             break
         elif response in ['n', 'no']:
@@ -205,7 +315,8 @@ def reset_api_token():
             
             # Reemplazar el archivo original
             os.replace(temp_file, script_name)
-            print("✅ Token de API reseteado a 'placeholder'")
+            print("✅ Token de API reseteado a 'placeholder' en el script")
+            print("ℹ️  Las credenciales principales se eliminaron del keyring")
             return True
         else:
             print("ℹ️  El token ya está en 'placeholder' o no se encontró")
@@ -215,24 +326,61 @@ def reset_api_token():
         print(f"❌ Error al resetear el token: {e}")
         return False
 
-def show_final_message(task_removed, files_deleted, token_reset):
+def show_manual_cleanup_instructions():
+    """Mostrar instrucciones para limpieza manual"""
+    print("\n🔧 INSTRUCCIONES PARA LIMPIEZA MANUAL")
+    print("-" * 40)
+    print("Si deseas hacer una limpieza completa manual, puedes:")
+    print()
+    print("🔑 ADMINISTRADOR DE CREDENCIALES:")
+    print("1. Presiona Win + R, escribe 'control' y presiona Enter")
+    print("2. Ve a 'Cuentas de usuario' > 'Administrador de credenciales'")
+    print("3. Busca 'UNETI-Grade-Checker' y elimínalo")
+    print()
+    print("📅 PROGRAMADOR DE TAREAS:")
+    print("1. Presiona Win + R, escribe 'taskschd.msc' y presiona Enter")
+    print("2. Busca tareas que contengan 'VerificadorNotasUNETI'")
+    print("3. Elimina todas las tareas encontradas")
+    print()
+    print("📁 ARCHIVOS RESTANTES:")
+    print("Revisa estos archivos en la carpeta del verificador:")
+    print("• config.json - Configuración de usuario")
+    print("• previous_grades.json - Datos de notas anteriores")
+    print("• grade_history.txt - Historial de cambios")
+    print("• verificador_notas.bat - Archivo de ejecución manual")
+    print("• grade_checker.py.backup - Backup del script original")
+
+def show_final_message(credentials_removed, task_removed, files_deleted, token_reset):
     """Mostrar mensaje final"""
     print("\n🎯 DESINSTALACIÓN COMPLETADA")
     print("=" * 60)
     
+    # Resumen de credenciales
+    if credentials_removed:
+        print("✅ Credenciales eliminadas del gestor de credenciales del sistema")
+        print("   • Token de API eliminado de keyring")
+        print("   • Información de autenticación borrada")
+    else:
+        print("⚠️  Las credenciales no se pudieron eliminar automáticamente")
+        print("   • Puedes eliminarlas manualmente desde el Administrador de credenciales")
+        print("   • Busca 'UNETI-Grade-Checker' en el gestor de credenciales")
+    
+    # Resumen de tareas
     if task_removed:
         print("✅ Tareas programadas eliminadas exitosamente")
         print("   • El verificador ya no se ejecutará automáticamente")
         print("   • Se eliminaron tanto la tarea diaria como la de intervalos")
     else:
-        print("❌ Algunas tareas programadas no se pudieron eliminar completamente")
+        print("⚠️  Algunas tareas programadas no se pudieron eliminar completamente")
         print("   • Es posible que necesites eliminarlas manualmente desde el Programador de tareas")
     
+    # Resumen de archivos
     if files_deleted:
         print("✅ Archivos seleccionados eliminados")
     
+    # Resumen de token
     if token_reset:
-        print("✅ Token de API reseteado")
+        print("✅ Token de API reseteado en el script")
     
     print()
     print("📋 ESTADO ACTUAL:")
@@ -241,6 +389,7 @@ def show_final_message(task_removed, files_deleted, token_reset):
     remaining_files = []
     files_to_check = [
         "grade_checker.py",
+        "config.json",
         "verificador_notas.bat", 
         "previous_grades.json",
         "grade_history.txt",
@@ -261,9 +410,14 @@ def show_final_message(task_removed, files_deleted, token_reset):
     print()
     print("ℹ️  NOTAS IMPORTANTES:")
     print("• El script principal del verificador sigue disponible")
-    print("• Puedes volver a configurar la automatización ejecutando el configurador")
-    print("• Los datos de notas se mantienen a menos que los hayas eliminado")
+    print("• Las credenciales han sido eliminadas del sistema")
     print("• Para reconfigurar, ejecuta 'configurador.py' nuevamente")
+    print("• Será necesario ingresar credenciales nuevamente")
+    print("• Los datos de notas se mantienen a menos que los hayas eliminado")
+    
+    # Mostrar instrucciones de limpieza manual
+    show_manual_cleanup_instructions()
+    
     print("=" * 60)
 
 def main():
@@ -276,9 +430,19 @@ def main():
         input("\nPresiona Enter para salir...")
         return
     
+    # Información sobre el nuevo sistema de credenciales
+    print("🔒 INFORMACIÓN SOBRE CREDENCIALES:")
+    print("Este desinstalador eliminará las credenciales almacenadas en el")
+    print("gestor de credenciales del sistema (keyring) además de las tareas programadas.")
+    print("Esto incluye el token de API que se almacena de forma segura.")
+    print("=" * 60)
+    print()
+    
     print("⚠️  ADVERTENCIA:")
-    print("Este proceso eliminará la ejecución automática del verificador de notas.")
-    print("Se eliminarán TODAS las tareas programadas relacionadas (diaria e intervalos).")
+    print("Este proceso eliminará:")
+    print("• TODAS las tareas programadas relacionadas (diaria e intervalos)")
+    print("• Las credenciales almacenadas en el gestor de credenciales del sistema")
+    print("• Opcionalmente, archivos de configuración y datos")
     print("¿Estás seguro de que quieres continuar?")
     print()
     
@@ -296,23 +460,28 @@ def main():
     print()
     
     try:
-        # Paso 1: Eliminar tareas programadas
+        # Paso 1: Eliminar credenciales almacenadas
+        credentials_removed = remove_stored_credentials()
+        
+        # Paso 2: Eliminar tareas programadas
         task_removed = remove_scheduled_tasks()
         
-        # Paso 2: Preguntar por archivos
+        # Paso 3: Preguntar por archivos
         files_to_delete = ask_delete_files()
         files_deleted = delete_files(files_to_delete) if files_to_delete else False
         
-        # Paso 3: Preguntar por resetear token
+        # Paso 4: Preguntar por resetear token
         token_reset = reset_api_token()
         
         # Mostrar resumen final
-        show_final_message(task_removed, files_deleted, token_reset)
+        show_final_message(credentials_removed, task_removed, files_deleted, token_reset)
         
     except KeyboardInterrupt:
         print("\n\n❌ Desinstalación cancelada por el usuario.")
     except Exception as e:
         print(f"\n❌ Error inesperado durante la desinstalación: {e}")
+        import traceback
+        traceback.print_exc()
     
     input("\nPresiona Enter para salir...")
 

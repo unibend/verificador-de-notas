@@ -219,90 +219,70 @@ def get_script_directory():
     else:
         return os.path.dirname(os.path.abspath(__file__))
 
-def update_grade_checker_script(api_token):
-    """Actualizar el script del verificador de notas con el token"""
-    print("\n🔧 PASO 3: Actualizando script del verificador...")
+def store_api_token(api_token, username):
+    """Almacenar el token de API en el gestor de credenciales del sistema"""
+    print("\n🔧 PASO 3: Almacenando token de API en el gestor de credenciales...")
     print("-" * 40)
     
-    # Advertencia de seguridad
-    print("⚠️  ADVERTENCIA DE SEGURIDAD:")
-    print("Tu token de API se almacenará en texto plano en el archivo 'grade_checker.py'.")
-    print("Este token permite acceder a tus datos académicos de UNETI.")
-    print("MANTÉN ESTOS ARCHIVOS EN UN LUGAR SEGURO y no los compartas con nadie.")
-    print("Si crees que tu token ha sido comprometido, cambia tu contraseña en UNETI.")
-    print()
-    
-    # Confirmación del usuario
-    while True:
-        response = input("¿Entiendes y aceptas continuar? (s/n): ").strip().lower()
-        if response in ['s', 'si', 'sí', 'y', 'yes']:
-            break
-        elif response in ['n', 'no']:
-            print("❌ Configuración cancelada por el usuario.")
-            return False
-        else:
-            print("Por favor, responde 's' para sí o 'n' para no.")
-    
-    # Usar el directorio del script actual
-    script_dir = get_script_directory()
-    script_path = os.path.join(script_dir, "grade_checker.py")
-    
-    print(f"📂 Buscando script en: {script_path}")
-    
-    if not os.path.exists(script_path):
-        print(f"❌ No se encontró el archivo 'grade_checker.py' en {script_dir}")
-        print("Asegúrate de que el archivo esté en la misma carpeta que este configurador.")
-        return False
-    
     try:
-        # Crear backup del archivo original
-        backup_path = os.path.join(script_dir, "grade_checker.py.backup")
-        shutil.copy2(script_path, backup_path)
-        print(f"📋 Backup creado: {backup_path}")
+        import keyring
         
-        # Leer el archivo original
-        with open(script_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        # Información de seguridad actualizada
+        print("🔒 INFORMACIÓN DE SEGURIDAD:")
+        print("Tu token de API se almacenará de forma segura en el gestor de credenciales del sistema.")
+        print("Esto es más seguro que almacenarlo en texto plano.")
+        print("El token se cifrará automáticamente por Windows.")
+        print()
         
-        # Verificar que el placeholder existe
-        if 'API_TOKEN = "placeholder"' not in content:
-            print("⚠️  No se encontró el placeholder del token en el script")
-            print("El token podría ya estar configurado o el archivo podría estar modificado")
-            
-            # Preguntar si continuar de todas formas
-            while True:
-                response = input("¿Continuar de todas formas? (s/n): ").strip().lower()
-                if response in ['s', 'si', 'sí', 'y', 'yes']:
-                    break
-                elif response in ['n', 'no']:
-                    return False
-                else:
-                    print("Por favor, responde 's' para sí o 'n' para no.")
+        # Confirmación del usuario
+        while True:
+            response = input("¿Continuar con el almacenamiento seguro del token? (s/n): ").strip().lower()
+            if response in ['s', 'si', 'sí', 'y', 'yes']:
+                break
+            elif response in ['n', 'no']:
+                print("❌ Configuración cancelada por el usuario.")
+                return False
+            else:
+                print("Por favor, responde 's' para sí o 'n' para no.")
         
-        # Reemplazar el placeholder con el token real
-        updated_content = content.replace('API_TOKEN = "placeholder"', f'API_TOKEN = "{api_token}"')
+        # Almacenar el token en el keyring
+        service_name = "UNETI-Grade-Checker"
+        keyring.set_password(service_name, username, api_token)
         
-        # Escribir el archivo actualizado de forma atómica
-        temp_file = os.path.join(script_dir, "grade_checker.py.tmp")
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            f.write(updated_content)
+        print("✅ Token almacenado exitosamente en el gestor de credenciales del sistema")
+        print(f"🔑 Servicio: {service_name}")
+        print(f"👤 Usuario: {username}")
+        print("🔒 El token está ahora cifrado y protegido por Windows.")
+        return True
         
-        # Reemplazar el archivo original
-        os.replace(temp_file, script_path)
+    except ImportError:
+        print("❌ Error: La librería 'keyring' no está instalada.")
+        print("Instálala con: pip install keyring")
+        return False
+    except Exception as e:
+        print(f"❌ Error al almacenar el token: {e}")
+        return False
+
+def save_username_config(username):
+    """Save username to config file for later credential management"""
+    try:
+        script_dir = get_script_directory()
+        config_path = os.path.join(script_dir, "config.json")
         
-        print("✅ Script actualizado correctamente con tu token de API")
-        print("🔒 Recuerda: mantén tus archivos seguros y no los compartas.")
+        config = {
+            "username": username,
+            "configured_date": datetime.now().isoformat(),
+            "service_name": "UNETI-Grade-Checker"
+        }
+        
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+        
+        print(f"✅ Configuración guardada en: config.json")
         return True
         
     except Exception as e:
-        print(f"❌ Error al actualizar el script: {e}")
-        # Restaurar backup si existe
-        if os.path.exists(backup_path):
-            try:
-                os.replace(backup_path, script_path)
-                print("📋 Backup restaurado debido al error")
-            except Exception:
-                pass
+        print(f"⚠️ Error al guardar configuración: {e}")
         return False
 
 def ask_for_automation():
@@ -322,46 +302,65 @@ def ask_for_automation():
         else:
             print("Por favor, responde 's' para sí o 'n' para no.")
 
-def create_batch_file():
-    """Crear archivo batch para ejecutar el script"""
+def create_batch_files():
+    """Crear archivos batch para ejecutar el script manual y automáticamente"""
     try:
         # Obtener rutas absolutas y validarlas
         script_dir = get_script_directory()
         python_exe = sys.executable
         script_path = os.path.join(script_dir, "grade_checker.py")
-        batch_path = os.path.join(script_dir, "verificador_notas.bat")
         
-        print(f"📂 Creando archivo batch en: {batch_path}")
+        # Archivos batch
+        manual_batch_path = os.path.join(script_dir, "verificador_notas.bat")
+        silent_batch_path = os.path.join(script_dir, "verificador_notas_silent.bat")
+        
+        print(f"📂 Creando archivos batch en: {script_dir}")
         
         # Validar que las rutas son seguras
         if not os.path.exists(python_exe):
             print(f"❌ No se encontró Python en: {python_exe}")
-            return None
+            return None, None
         
         if not os.path.exists(script_path):
             print(f"❌ No se encontró el script en: {script_path}")
-            return None
+            return None, None
         
-        # Crear contenido del archivo batch con rutas escapadas
-        batch_content = f'''@echo off
+        # Crear contenido del archivo batch manual (con pausa)
+        manual_batch_content = f'''@echo off
 cd /d "{script_dir}"
+echo Ejecutando verificador de notas...
+echo.
 "{python_exe}" "{script_path}"
+echo.
+echo Verificacion completada.
 pause
 '''
         
-        # Escribir archivo batch
-        with open(batch_path, 'w', encoding='utf-8') as f:
-            f.write(batch_content)
+        # Crear contenido del archivo batch silencioso (sin ventana)
+        silent_batch_content = f'''@echo off
+cd /d "{script_dir}"
+"{python_exe}" "{script_path}" > nul 2>&1
+'''
         
-        print(f"✅ Archivo batch creado: {batch_path}")
-        return batch_path
+        # Escribir archivo batch manual
+        with open(manual_batch_path, 'w', encoding='utf-8') as f:
+            f.write(manual_batch_content)
+        
+        # Escribir archivo batch silencioso
+        with open(silent_batch_path, 'w', encoding='utf-8') as f:
+            f.write(silent_batch_content)
+        
+        print(f"✅ Archivo batch manual creado: {manual_batch_path}")
+        print(f"✅ Archivo batch silencioso creado: {silent_batch_path}")
+        
+        return manual_batch_path, silent_batch_path
         
     except Exception as e:
-        print(f"❌ Error al crear archivo batch: {e}")
-        return None
+        print(f"❌ Error al crear archivos batch: {e}")
+        return None, None
 
-def add_to_task_scheduler(batch_path, start_time, end_time, interval):
-    """Agregar tareas al programador de tareas de Windows"""
+def add_to_task_scheduler(silent_batch_path, start_time, end_time, interval):
+    """Agregar tareas al programador de tareas de Windows usando el archivo batch silencioso"""
     print("\n📅 Configurando tareas programadas...")
     print("-" * 40)
     
@@ -371,20 +370,22 @@ def add_to_task_scheduler(batch_path, start_time, end_time, interval):
         interval_task_name = "VerificadorNotasUNETI_Interval"
         
         # Validar que el archivo batch existe
-        if not os.path.exists(batch_path):
-            print(f"❌ El archivo batch no existe: {batch_path}")
+        if not os.path.exists(silent_batch_path):
+            print(f"❌ El archivo batch silencioso no existe: {silent_batch_path}")
             return False
         
         print("⏳ Creando tarea programada diaria...")
         
-        # Comando para crear la tarea diaria
+        # Comando para crear la tarea diaria (ejecuta sin mostrar ventana)
         daily_task_cmd = [
             'schtasks', '/create',
             '/tn', daily_task_name,
-            '/tr', f'"{batch_path}"',
+            '/tr', f'"{silent_batch_path}"',
             '/sc', 'daily',
             '/st', start_time,
-            '/f'
+            '/ru', 'SYSTEM',  # Ejecutar como sistema para evitar ventanas
+            '/rl', 'HIGHEST',  # Nivel más alto para evitar problemas de permisos
+            '/f'  # Forzar creación (sobrescribir si existe)
         ]
         
         result = subprocess.run(daily_task_cmd, capture_output=True, text=True)
@@ -402,12 +403,14 @@ def add_to_task_scheduler(batch_path, start_time, end_time, interval):
         interval_task_cmd = [
             'schtasks', '/create',
             '/tn', interval_task_name,
-            '/tr', f'"{batch_path}"',
+            '/tr', f'"{silent_batch_path}"',
             '/sc', 'minute',
             '/mo', str(interval),
             '/st', start_time,
             '/et', end_time,
-            '/f'
+            '/ru', 'SYSTEM',  # Ejecutar como sistema
+            '/rl', 'HIGHEST',  # Nivel más alto
+            '/f'  # Forzar creación
         ]
         
         result = subprocess.run(interval_task_cmd, capture_output=True, text=True)
@@ -422,8 +425,12 @@ def add_to_task_scheduler(batch_path, start_time, end_time, interval):
         
         print("✅ Tarea por intervalos creada exitosamente!")
         print(f"📋 Tareas creadas:")
-        print(f"   • {daily_task_name} - Se ejecuta diariamente a las {start_time}")
-        print(f"   • {interval_task_name} - Se ejecuta cada {interval} minutos entre {start_time} y {end_time}")
+        print(f"   • {daily_task_name} - Se ejecuta diariamente a las {start_time} (silenciosamente)")
+        print(f"   • {interval_task_name} - Se ejecuta cada {interval} minutos entre {start_time} y {end_time} (silenciosamente)")
+        print("\n🔇 MODO SILENCIOSO:")
+        print("• Las tareas programadas se ejecutarán en segundo plano sin mostrar ventanas")
+        print("• Solo verás las notificaciones cuando haya cambios en las notas")
+        print("• Para ver el progreso manualmente, usa 'verificador_notas.bat'")
         print("\nPara gestionar las tareas puedes:")
         print("• Abrir 'Programador de tareas' en Windows")
         print(f"• Buscar las tareas '{daily_task_name}' y '{interval_task_name}'")
@@ -483,32 +490,35 @@ def show_final_instructions(automation_enabled):
     print("El verificador de notas ha sido configurado correctamente.")
     print()
     print("📋 RESUMEN DE CONFIGURACIÓN:")
-    print("• ✅ Token de API obtenido y configurado")
-    print("• ✅ Script del verificador actualizado")
+    print("• ✅ Token de API obtenido y almacenado de forma segura")
+    print("• ✅ Credenciales guardadas en el gestor de credenciales del sistema")
     print("• ✅ Verificación inicial completada")
     if automation_enabled:
-        print("• ✅ Tarea programada configurada")
-        print("  - Se ejecutará cada 30 minutos automáticamente")
+        print("• ✅ Tarea programada configurada (modo silencioso)")
+        print("  - Se ejecutará automáticamente en segundo plano")
+        print("  - No mostrará ventanas durante la ejecución automática")
     else:
         print("• ⚠️  Automatización omitida")
     print()
-    print("🔒 RECORDATORIO DE SEGURIDAD:")
-    print("• Tu token de API está almacenado en texto plano en 'grade_checker.py'")
-    print("• MANTÉN ESTOS ARCHIVOS EN UN LUGAR SEGURO")
-    print("• No compartas estos archivos con nadie")
-    print("• Si crees que tu token fue comprometido, cambia tu contraseña en UNETI")
+    print("🔒 INFORMACIÓN DE SEGURIDAD:")
+    print("• Tu token de API está almacenado de forma segura en el gestor de credenciales")
+    print("• El token está cifrado por Windows automáticamente")
+    print("• No hay archivos con información sensible en texto plano")
+    print("• Si cambias tu contraseña en UNETI, deberás reconfigurar el verificador")
     print()
     print("📝 ARCHIVOS CREADOS:")
-    print("• verificador_notas.bat - Para ejecutar manualmente")
+    print("• verificador_notas.bat - Para ejecutar manualmente (muestra ventana)")
+    print("• verificador_notas_silent.bat - Para ejecución automática (silencioso)")
     print("• previous_grades.json - Datos de notas anteriores")
     print("• grade_history.txt - Historial de cambios")
-    print("• grade_checker.py.backup - Respaldo del archivo original")
     print()
     print("🔔 NOTIFICACIONES:")
     print("Ahora recibirás notificaciones cuando:")
     print("• Recibas una nueva calificación")
     print("• Se actualice una calificación existente")
     print("• Se agregue una nueva materia")
+    if automation_enabled:
+        print("• Las notificaciones aparecerán automáticamente sin mostrar ventanas de comandos")
     print()
     print("⚙️ GESTIÓN:")
     print("• Para ejecutar manualmente: doble clic en 'verificador_notas.bat'")
@@ -516,8 +526,22 @@ def show_final_instructions(automation_enabled):
     if automation_enabled:
         print("• Para gestionar la automatización: buscar 'VerificadorNotasUNETI' en el Programador de tareas")
         print("• Para detener la automatización: deshabilitar la tarea en el Programador de tareas")
+        print("• Las tareas programadas se ejecutan silenciosamente en segundo plano")
     else:
         print("• Para configurar automatización: ejecutar este configurador nuevamente")
+    print()
+    print("🔇 MODO SILENCIOSO:")
+    if automation_enabled:
+        print("• Las tareas automáticas no mostrarán ventanas de comandos")
+        print("• Solo verás las notificaciones emergentes cuando haya cambios")
+        print("• Para ver el progreso en tiempo real, ejecuta manualmente 'verificador_notas.bat'")
+    else:
+        print("• Disponible para cuando configures la automatización")
+    print()
+    print("🔑 GESTIÓN DE CREDENCIALES:")
+    print("• Las credenciales se almacenan en el 'Administrador de credenciales' de Windows")
+    print("• Para eliminar las credenciales: buscar 'UNETI-Grade-Checker' en el Administrador de credenciales")
+    print("• Para reconfigurar: ejecutar este configurador nuevamente")
     print()
     print("🆘 SOPORTE:")
     print("Si tienes problemas, revisa los archivos de log o contacta al creador del script.")
@@ -533,11 +557,22 @@ def main():
     
     print_banner()
     
-    # Advertencia de seguridad inicial
-    print("🔒 ADVERTENCIA DE SEGURIDAD IMPORTANTE:")
-    print("Este script almacenará tu token de API en texto plano en tu computadora.")
-    print("Mantén estos archivos en un lugar seguro y no los compartas con nadie.")
-    print("Si alguien más accede a estos archivos, podría tener acceso completo a tu cuenta de UNETI.")
+    # Verificar que keyring está instalado
+    try:
+        import keyring
+        print("✅ Librería keyring detectada - Almacenamiento seguro disponible")
+    except ImportError:
+        print("❌ ERROR: La librería 'keyring' no está instalada.")
+        print("Instálala con: pip install keyring")
+        print("Esta librería es necesaria para el almacenamiento seguro de credenciales.")
+        input("\nPresiona Enter para salir...")
+        return
+    
+    # Advertencia de seguridad inicial actualizada
+    print("\n🔒 INFORMACIÓN DE SEGURIDAD:")
+    print("Este script almacenará tu token de API de forma segura en el gestor de credenciales del sistema.")
+    print("El token será cifrado automáticamente por Windows y no se guardará en texto plano.")
+    print("Esto proporciona mayor seguridad para tus credenciales.")
     print("=" * 60)
     print()
     
@@ -576,11 +611,14 @@ def main():
             input("\nPresiona Enter para salir...")
             return
         
-        # Paso 3: Actualizar script
-        if not update_grade_checker_script(api_token):
-            print("❌ No se pudo actualizar el script.")
+        # Paso 3: Almacenar token en keyring
+        if not store_api_token(api_token, username):
+            print("❌ No se pudo almacenar el token de API.")
             input("\nPresiona Enter para salir...")
             return
+        
+        # Guardar username en config para gestión posterior
+        save_username_config(username)
         
         # Paso 4: Configurar automatización (si no se omite)
         automation_enabled = False
@@ -599,19 +637,20 @@ def main():
                 # Valores por defecto para cuando no se automatiza
                 start_time, end_time, interval = "08:00", "22:00", 30
         
-        batch_path = None
+        # Crear archivos batch (manual y silencioso)
+        manual_batch_path, silent_batch_path = create_batch_files()
+        
+        if not manual_batch_path or not silent_batch_path:
+            print("⚠️  No se pudieron crear los archivos batch.")
+            input("\nPresiona Enter para salir...")
+            return
+        
+        # Configurar automatización si se solicitó
         if automate:
-            batch_path = create_batch_file()
-            if batch_path:
-                if add_to_task_scheduler(batch_path, start_time, end_time, interval):
-                    automation_enabled = True
-                else:
-                    print("⚠️  La tarea programada no se pudo crear, pero puedes ejecutar manualmente.")
+            if add_to_task_scheduler(silent_batch_path, start_time, end_time, interval):
+                automation_enabled = True
             else:
-                print("⚠️  No se pudo crear el archivo batch para la automatización.")
-        else:
-            # Crear archivo batch de todas formas para ejecución manual
-            batch_path = create_batch_file()
+                print("⚠️  La tarea programada no se pudo crear, pero puedes ejecutar manualmente.")
         
         # Paso 5: Ejecutar por primera vez
         if run_grade_checker():
