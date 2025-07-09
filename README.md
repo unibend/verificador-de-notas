@@ -33,7 +33,6 @@ Este proyecto es una herramienta útil para los estudiantes de la UNETI que dese
    ```powershell
    python run.py
    ```
-
 3. **Sigue las instrucciones en pantalla**:
    - El programa verificará automáticamente las dependencias
    - Te guiará a través de la configuración paso a paso
@@ -54,35 +53,14 @@ Este proyecto es una herramienta útil para los estudiantes de la UNETI que dese
 - ⚠️ Ejecución manual únicamente
 - ⚠️ Sin automatización
 
-## 🔧 Características del Nuevo Sistema
 
-### 🛡️ Seguridad Mejorada:
+
+## 🛡️ Seguridad:
 - **Almacenamiento Seguro**: Tu token de API se almacena de forma segura en el gestor de credenciales de Windows (keyring)
 - **Cifrado Automático**: Windows cifra automáticamente las credenciales almacenadas
 - **Sin Archivos de Texto Plano**: No se guardan credenciales en archivos de texto plano
 - **Gestión Centralizada**: Todas las credenciales se gestionan desde el Administrador de credenciales de Windows
 
-### 🔄 Lanzador Inteligente (`run.py`):
-- **Verificación Automática**: Detecta el estado de la configuración automáticamente
-- **Instalación de Dependencias**: Instala automáticamente las librerías necesarias
-- **Gestión Completa**: Configurar, ejecutar, actualizar y desinstalar desde un solo lugar
-- **Detección de Permisos**: Detecta automáticamente si tienes permisos de administrador
-- **Información del Sistema**: Muestra información detallada sobre tu configuración
-
-### 📋 Menú Principal:
-```
-🎯 OPCIONES DISPONIBLES:
-1. 🚀 Ejecutar verificador de notas
-2. ⚙️  Configurar/Reconfigurar  
-3. 📦 Instalar dependencias
-4. 🗑️  Desinstalar
-5. ❌ Salir
-```
-
-### 🔇 Modo Silencioso:
-- **Ejecución en Segundo Plano**: Las tareas automáticas no muestran ventanas
-- **Notificaciones Únicamente**: Solo verás las notificaciones cuando haya cambios
-- **Dos Archivos Batch**: `verificador_notas.bat` (manual con ventana) y `verificador_notas_silent.bat` (automático sin ventana)
 
 ## 💡 Funcionamiento Interno
 
@@ -94,7 +72,7 @@ Este proyecto es una herramienta útil para los estudiantes de la UNETI que dese
 
 ### 📊 Verificación de Notas:
 - **Conexión Segura**: Utiliza el token almacenado para conectarse a UNETI
-- **Comparación Inteligente**: Compara las notas actuales con las anteriores en `previous_grades.json`
+- **Comparación Inteligente**: Compara las notas actuales con las anteriores, que están almacenadas en `previous_grades.json`
 - **Notificaciones Contextuales**: Muestra notificaciones detalladas sobre los cambios
 - **Historial Completo**: Registra todos los cambios en `grade_history.txt`
 
@@ -104,6 +82,11 @@ Este proyecto es una herramienta útil para los estudiantes de la UNETI que dese
 - **Intervalos Ajustables**: Elige entre 15, 30, 45 o 60 minutos
 - **Ejecución Silenciosa**: Las tareas automáticas no muestran ventanas
 
+### 🔇 Modo Silencioso:
+- **Ejecución en Segundo Plano**: Las tareas automáticas no muestran ventanas
+- **Notificaciones Únicamente**: Solo verás las notificaciones cuando haya cambios
+- **Dos Archivos Batch**: `verificador_notas.bat` (manual con ventana) y `verificador_notas_silent.bat` (automático sin ventana)
+- 
 ## 📁 Archivos Creados
 
 Después de la instalación, encontrarás estos archivos:
@@ -125,12 +108,12 @@ Después de la instalación, encontrarás estos archivos:
 
 ### 🚀 Ejecución Manual:
 ```bash
-# Usando el lanzador inteligente
 python run.py
-
-# Usando el archivo batch
-verificador_notas.bat
 ```
+
+#### Usando el archivo batch
+Haz doble click en ```verificador_notas.bat```
+
 
 ### 🔄 Reconfiguración:
 ```bash
