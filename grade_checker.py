@@ -41,6 +41,7 @@ class MoodleGradeChecker:
         self.api_url = f"{base_url}/webservice/rest/server.php"
         self.grades_file = "previous_grades.json"
         self.history_file = "grade_history.txt"
+        self.current_grades_file = "notas_actuales.txt"
         self.config_file = "config.json"
         self.service_name = "UNETI-Grade-Checker"
         
@@ -377,6 +378,28 @@ class MoodleGradeChecker:
             
             f.write("\n")
     
+    def write_current_grades_to_file(self, current_grades):
+        """Write the current grades to notas_actuales.txt"""
+        print(f"Escribiendo calificaciones actuales a {self.current_grades_file}...")
+        try:
+            with open(self.current_grades_file, 'w', encoding='utf-8') as f:
+                f.write(f"Calificaciones Actuales - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write("=" * 60 + "\n\n")
+                
+                for course_name, course_data in current_grades.items():
+                    percentage = course_data.get('percentage', 0)
+                    achieved = course_data.get('total_achieved', 0)
+                    possible = course_data.get('total_possible', 0)
+                    graded_count = course_data.get('graded_assignments', 0)
+                    total_assignments = len(course_data.get('grades', []))
+                    
+                    f.write(f"📚 Curso: {course_name}\n")
+                    f.write(f"    Calificación: {achieved:.2f}/{possible} ({percentage:.2f}%)\n")
+                    f.write(f"    Tareas Calificadas: {graded_count}/{total_assignments}\n\n")
+            print(f"✅ Calificaciones actuales guardadas en {self.current_grades_file}")
+        except Exception as e:
+            print(f"❌ Error al escribir calificaciones actuales a archivo: {e}")
+            
     def format_grade_display(self, grade_item):
         """Format grade for display"""
         item_name = grade_item.get('itemname', 'Desconocido')
@@ -591,6 +614,9 @@ class MoodleGradeChecker:
         # Save current grades
         print("Guardando calificaciones actuales...")
         self.save_current_grades(current_grades)
+        
+        # Write current grades to the new file
+        self.write_current_grades_to_file(current_grades)
         
         # Send notifications if there are changes - now handled individually
         # No bulk notifications needed since we send individual dialogs
