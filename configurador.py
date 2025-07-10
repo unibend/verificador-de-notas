@@ -302,19 +302,19 @@ def ask_for_automation():
         else:
             print("Por favor, responde 's' para sí o 'n' para no.")
 
-def create_batch_files():
-    """Crear archivos batch para ejecutar el script manual y automáticamente"""
+def create_batch_and_vbs_files():
+    """Crear archivos batch y VBS para ejecutar el script manual y automáticamente"""
     try:
         # Obtener rutas absolutas y validarlas
         script_dir = get_script_directory()
         python_exe = sys.executable
         script_path = os.path.join(script_dir, "grade_checker.py")
         
-        # Archivos batch
+        # Archivos de ejecución
         manual_batch_path = os.path.join(script_dir, "verificador_notas.bat")
-        silent_batch_path = os.path.join(script_dir, "verificador_notas_silent.bat")
+        silent_vbs_path = os.path.join(script_dir, "verificador_notas_silent.vbs")
         
-        print(f"📂 Creando archivos batch en: {script_dir}")
+        print(f"📂 Creando archivos de ejecución en: {script_dir}")
         
         # Validar que las rutas son seguras
         if not os.path.exists(python_exe):
@@ -336,31 +336,31 @@ echo Verificacion completada.
 pause
 '''
         
-        # Crear contenido del archivo batch silencioso (sin ventana)
-        silent_batch_content = f'''@echo off
-cd /d "{script_dir}"
-"{python_exe}" "{script_path}" > nul 2>&1
+        # Crear contenido del archivo VBS para ejecución silenciosa
+        vbs_content = f'''Set WshShell = CreateObject("WScript.Shell")
+WshShell.CurrentDirectory = "{script_dir}"
+WshShell.Run """{python_exe}"" ""{script_path}""", 0, False
 '''
         
         # Escribir archivo batch manual
         with open(manual_batch_path, 'w', encoding='utf-8') as f:
             f.write(manual_batch_content)
         
-        # Escribir archivo batch silencioso
-        with open(silent_batch_path, 'w', encoding='utf-8') as f:
-            f.write(silent_batch_content)
+        # Escribir archivo VBS silencioso
+        with open(silent_vbs_path, 'w', encoding='utf-8') as f:
+            f.write(vbs_content)
         
         print(f"✅ Archivo batch manual creado: {manual_batch_path}")
-        print(f"✅ Archivo batch silencioso creado: {silent_batch_path}")
+        print(f"✅ Archivo VBS silencioso creado: {silent_vbs_path}")
         
-        return manual_batch_path, silent_batch_path
+        return manual_batch_path, silent_vbs_path
         
     except Exception as e:
-        print(f"❌ Error al crear archivos batch: {e}")
+        print(f"❌ Error al crear archivos de ejecución: {e}")
         return None, None
 
-def add_to_task_scheduler(silent_batch_path, start_time, end_time, interval):
-    """Agregar tareas al programador de tareas de Windows usando el archivo batch silencioso"""
+def add_to_task_scheduler(silent_vbs_path, start_time, end_time, interval):
+    """Agregar tareas al programador de tareas de Windows usando el archivo VBS"""
     print("\n📅 Configurando tareas programadas...")
     print("-" * 40)
     
@@ -369,22 +369,23 @@ def add_to_task_scheduler(silent_batch_path, start_time, end_time, interval):
         daily_task_name = "VerificadorNotasUNETI_Daily"
         interval_task_name = "VerificadorNotasUNETI_Interval"
         
-        # Validar que el archivo batch existe
-        if not os.path.exists(silent_batch_path):
-            print(f"❌ El archivo batch silencioso no existe: {silent_batch_path}")
+        # Validar que el archivo VBS existe
+        if not os.path.exists(silent_vbs_path):
+            print(f"❌ El archivo VBS no existe: {silent_vbs_path}")
             return False
+        
+        # Get current user
+        current_user = os.getenv('USERNAME')
         
         print("⏳ Creando tarea programada diaria...")
         
-        # Comando para crear la tarea diaria (ejecuta sin mostrar ventana)
+        # Comando para crear la tarea diaria usando el archivo VBS
         daily_task_cmd = [
             'schtasks', '/create',
             '/tn', daily_task_name,
-            '/tr', f'"{silent_batch_path}"',
+            '/tr', f'wscript.exe "{silent_vbs_path}"',
             '/sc', 'daily',
             '/st', start_time,
-            '/ru', 'SYSTEM',  # Ejecutar como sistema para evitar ventanas
-            '/rl', 'HIGHEST',  # Nivel más alto para evitar problemas de permisos
             '/f'  # Forzar creación (sobrescribir si existe)
         ]
         
@@ -403,13 +404,11 @@ def add_to_task_scheduler(silent_batch_path, start_time, end_time, interval):
         interval_task_cmd = [
             'schtasks', '/create',
             '/tn', interval_task_name,
-            '/tr', f'"{silent_batch_path}"',
+            '/tr', f'wscript.exe "{silent_vbs_path}"',
             '/sc', 'minute',
             '/mo', str(interval),
             '/st', start_time,
             '/et', end_time,
-            '/ru', 'SYSTEM',  # Ejecutar como sistema
-            '/rl', 'HIGHEST',  # Nivel más alto
             '/f'  # Forzar creación
         ]
         
@@ -425,10 +424,12 @@ def add_to_task_scheduler(silent_batch_path, start_time, end_time, interval):
         
         print("✅ Tarea por intervalos creada exitosamente!")
         print(f"📋 Tareas creadas:")
-        print(f"   • {daily_task_name} - Se ejecuta diariamente a las {start_time} (silenciosamente)")
-        print(f"   • {interval_task_name} - Se ejecuta cada {interval} minutos entre {start_time} y {end_time} (silenciosamente)")
+        print(f"   • {daily_task_name} - Se ejecuta diariamente a las {start_time}")
+        print(f"   • {interval_task_name} - Se ejecuta cada {interval} minutos entre {start_time} y {end_time}")
+        print(f"   • Usuario: {current_user}")
         print("\n🔇 MODO SILENCIOSO:")
-        print("• Las tareas programadas se ejecutarán en segundo plano sin mostrar ventanas")
+        print("• Las tareas programadas se ejecutarán completamente en segundo plano")
+        print("• No se mostrará ninguna ventana durante la ejecución automática")
         print("• Solo verás las notificaciones cuando haya cambios en las notas")
         print("• Para ver el progreso manualmente, usa 'verificador_notas.bat'")
         print("\nPara gestionar las tareas puedes:")
@@ -494,9 +495,10 @@ def show_final_instructions(automation_enabled):
     print("• ✅ Credenciales guardadas en el gestor de credenciales del sistema")
     print("• ✅ Verificación inicial completada")
     if automation_enabled:
-        print("• ✅ Tarea programada configurada (modo silencioso)")
+        print("• ✅ Tarea programada configurada (completamente silenciosa)")
         print("  - Se ejecutará automáticamente en segundo plano")
-        print("  - No mostrará ventanas durante la ejecución automática")
+        print("  - No mostrará ninguna ventana durante la ejecución automática")
+        print("  - Ejecuta en contexto de usuario (acceso a credenciales y notificaciones)")
     else:
         print("• ⚠️  Automatización omitida")
     print()
@@ -508,7 +510,7 @@ def show_final_instructions(automation_enabled):
     print()
     print("📝 ARCHIVOS CREADOS:")
     print("• verificador_notas.bat - Para ejecutar manualmente (muestra ventana)")
-    print("• verificador_notas_silent.bat - Para ejecución automática (silencioso)")
+    print("• verificador_notas_silent.vbs - Para ejecución silenciosa (usado por las tareas)")
     print("• previous_grades.json - Datos de notas anteriores")
     print("• grade_history.txt - Historial de cambios")
     print()
@@ -518,7 +520,7 @@ def show_final_instructions(automation_enabled):
     print("• Se actualice una calificación existente")
     print("• Se agregue una nueva materia")
     if automation_enabled:
-        print("• Las notificaciones aparecerán automáticamente sin mostrar ventanas de comandos")
+        print("• Las notificaciones aparecerán automáticamente sin ventanas de comandos")
     print()
     print("⚙️ GESTIÓN:")
     print("• Para ejecutar manualmente: doble clic en 'verificador_notas.bat'")
@@ -526,13 +528,14 @@ def show_final_instructions(automation_enabled):
     if automation_enabled:
         print("• Para gestionar la automatización: buscar 'VerificadorNotasUNETI' en el Programador de tareas")
         print("• Para detener la automatización: deshabilitar la tarea en el Programador de tareas")
-        print("• Las tareas programadas se ejecutan silenciosamente en segundo plano")
+        print("• Las tareas programadas se ejecutan completamente en silencio usando el archivo VBS")
     else:
         print("• Para configurar automatización: ejecutar este configurador nuevamente")
     print()
     print("🔇 MODO SILENCIOSO:")
     if automation_enabled:
-        print("• Las tareas automáticas no mostrarán ventanas de comandos")
+        print("• Las tareas automáticas utilizan el archivo VBS para ejecución completamente silenciosa")
+        print("• No se mostrará ninguna ventana de consola durante la ejecución automática")
         print("• Solo verás las notificaciones emergentes cuando haya cambios")
         print("• Para ver el progreso en tiempo real, ejecuta manualmente 'verificador_notas.bat'")
     else:
@@ -637,17 +640,17 @@ def main():
                 # Valores por defecto para cuando no se automatiza
                 start_time, end_time, interval = "08:00", "22:00", 30
         
-        # Crear archivos batch (manual y silencioso)
-        manual_batch_path, silent_batch_path = create_batch_files()
+        # Crear archivos batch (manual) y VBS (silencioso)
+        manual_batch_path, silent_vbs_path = create_batch_and_vbs_files()
         
-        if not manual_batch_path or not silent_batch_path:
-            print("⚠️  No se pudieron crear los archivos batch.")
+        if not manual_batch_path or not silent_vbs_path:
+            print("⚠️  No se pudieron crear los archivos de ejecución.")
             input("\nPresiona Enter para salir...")
             return
         
         # Configurar automatización si se solicitó
         if automate:
-            if add_to_task_scheduler(silent_batch_path, start_time, end_time, interval):
+            if add_to_task_scheduler(silent_vbs_path, start_time, end_time, interval):
                 automation_enabled = True
             else:
                 print("⚠️  La tarea programada no se pudo crear, pero puedes ejecutar manualmente.")
