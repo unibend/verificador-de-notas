@@ -213,6 +213,7 @@ def ask_delete_files():
     files_to_check = [
         ("config.json", "Configuración de usuario y credenciales"),
         ("verificador_notas.bat", "Archivo batch para ejecución manual"),
+        ("verificador_notas_silent.vbs", "Archivo VBS para ejecución silenciosa"),
         ("previous_grades.json", "Datos de notas anteriores guardadas"),
         ("grade_history.txt", "Historial completo de cambios de notas"),
         ("grade_checker.py.backup", "Backup del archivo original del verificador")
@@ -234,8 +235,6 @@ def ask_delete_files():
                 else:
                     print("   Por favor, responde 's' para sí o 'n' para no.")
             print()
-        else:
-            print(f"ℹ️  {filename} no existe")
     
     return files_to_delete
 
@@ -278,7 +277,7 @@ def reset_api_token():
     
     print("¿Quieres resetear el token de API en el script del verificador?")
     print("(Esto volverá a poner 'placeholder' en lugar de tu token actual)")
-    print("NOTA: Con el nuevo sistema, las credenciales se almacenan en keyring,")
+    print("NOTA: Las credenciales se almacenan en keyring,")
     print("por lo que este paso es opcional y principalmente para limpieza.")
     print()
     
@@ -345,9 +344,10 @@ def show_manual_cleanup_instructions():
     print("📁 ARCHIVOS RESTANTES:")
     print("Revisa estos archivos en la carpeta del verificador:")
     print("• config.json - Configuración de usuario")
+    print("• verificador_notas.bat - Archivo de ejecución manual")
+    print("• verificador_notas_silent.vbs - Archivo para ejecución automática")
     print("• previous_grades.json - Datos de notas anteriores")
     print("• grade_history.txt - Historial de cambios")
-    print("• verificador_notas.bat - Archivo de ejecución manual")
     print("• grade_checker.py.backup - Backup del script original")
 
 def show_final_message(credentials_removed, task_removed, files_deleted, token_reset):
@@ -369,7 +369,7 @@ def show_final_message(credentials_removed, task_removed, files_deleted, token_r
     if task_removed:
         print("✅ Tareas programadas eliminadas exitosamente")
         print("   • El verificador ya no se ejecutará automáticamente")
-        print("   • Se eliminaron tanto la tarea diaria como la de intervalos")
+        print("   • Se eliminaron todas las tareas relacionadas")
     else:
         print("⚠️  Algunas tareas programadas no se pudieron eliminar completamente")
         print("   • Es posible que necesites eliminarlas manualmente desde el Programador de tareas")
@@ -390,7 +390,7 @@ def show_final_message(credentials_removed, task_removed, files_deleted, token_r
     files_to_check = [
         "grade_checker.py",
         "config.json",
-        "verificador_notas.bat", 
+        "verificador_notas.bat",
         "previous_grades.json",
         "grade_history.txt",
         "grade_checker.py.backup"
@@ -411,6 +411,7 @@ def show_final_message(credentials_removed, task_removed, files_deleted, token_r
     print("ℹ️  NOTAS IMPORTANTES:")
     print("• El script principal del verificador sigue disponible")
     print("• Las credenciales han sido eliminadas del sistema")
+    print("• Las tareas programadas han sido eliminadas")
     print("• Para reconfigurar, ejecuta 'configurador.py' nuevamente")
     print("• Será necesario ingresar credenciales nuevamente")
     print("• Los datos de notas se mantienen a menos que los hayas eliminado")
@@ -430,7 +431,7 @@ def main():
         input("\nPresiona Enter para salir...")
         return
     
-    # Información sobre el nuevo sistema de credenciales
+    # Información sobre el sistema de credenciales
     print("🔒 INFORMACIÓN SOBRE CREDENCIALES:")
     print("Este desinstalador eliminará las credenciales almacenadas en el")
     print("gestor de credenciales del sistema (keyring) además de las tareas programadas.")
@@ -440,7 +441,7 @@ def main():
     
     print("⚠️  ADVERTENCIA:")
     print("Este proceso eliminará:")
-    print("• TODAS las tareas programadas relacionadas (diaria e intervalos)")
+    print("• TODAS las tareas programadas relacionadas")
     print("• Las credenciales almacenadas en el gestor de credenciales del sistema")
     print("• Opcionalmente, archivos de configuración y datos")
     print("¿Estás seguro de que quieres continuar?")
