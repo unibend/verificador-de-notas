@@ -216,7 +216,8 @@ def ask_delete_files():
         ("verificador_notas_silent.vbs", "Archivo VBS para ejecución silenciosa"),
         ("previous_grades.json", "Datos de notas anteriores guardadas"),
         ("grade_history.txt", "Historial completo de cambios de notas"),
-        ("grade_checker.py.backup", "Backup del archivo original del verificador")
+        ("grade_checker.py.backup", "Backup del archivo original del verificador"),
+        ("notas_actuales.txt", "Archivo de texto con las calificaciones actuales"),
     ]
     
     files_to_delete = []
@@ -264,66 +265,6 @@ def delete_files(files_to_delete):
     
     return success
 
-def reset_api_token():
-    """Preguntar si quiere resetear el token de API en el script"""
-    print("\n🔧 RESETEAR CONFIGURACIÓN DEL SCRIPT")
-    print("-" * 40)
-    
-    script_name = "grade_checker.py"
-    
-    if not validate_file_path(script_name):
-        print(f"ℹ️  El archivo '{script_name}' no existe.")
-        return True
-    
-    print("¿Quieres resetear el token de API en el script del verificador?")
-    print("(Esto volverá a poner 'placeholder' en lugar de tu token actual)")
-    print("NOTA: Las credenciales se almacenan en keyring,")
-    print("por lo que este paso es opcional y principalmente para limpieza.")
-    print()
-    
-    while True:
-        response = input("👉 Resetear token de API en el script? (s/n): ").strip().lower()
-        if response in ['s', 'si', 'sí', 'y', 'yes']:
-            break
-        elif response in ['n', 'no']:
-            return True
-        else:
-            print("Por favor, responde 's' para sí o 'n' para no.")
-    
-    try:
-        # Crear backup antes de modificar
-        backup_name = f"{script_name}.backup"
-        with open(script_name, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # Buscar líneas que contengan API_TOKEN
-        lines = content.split('\n')
-        modified = False
-        
-        for i, line in enumerate(lines):
-            if 'API_TOKEN = ' in line and 'placeholder' not in line:
-                lines[i] = '    API_TOKEN = "placeholder"'
-                modified = True
-                break
-        
-        if modified:
-            # Escribir el archivo modificado de forma atómica
-            temp_file = f"{script_name}.tmp"
-            with open(temp_file, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(lines))
-            
-            # Reemplazar el archivo original
-            os.replace(temp_file, script_name)
-            print("✅ Token de API reseteado a 'placeholder' en el script")
-            print("ℹ️  Las credenciales principales se eliminaron del keyring")
-            return True
-        else:
-            print("ℹ️  El token ya está en 'placeholder' o no se encontró")
-            return True
-            
-    except Exception as e:
-        print(f"❌ Error al resetear el token: {e}")
-        return False
 
 def show_manual_cleanup_instructions():
     """Mostrar instrucciones para limpieza manual"""
