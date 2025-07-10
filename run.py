@@ -29,13 +29,6 @@ def get_script_directory():
     else:
         return os.path.dirname(os.path.abspath(__file__))
 
-def check_admin_privileges():
-    """Check if the script is running with administrator privileges"""
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
-        return False
-
 def is_windows():
     """Check if we're on Windows"""
     return platform.system() == "Windows"
@@ -55,6 +48,13 @@ def check_keyring_available():
         return True
     except ImportError:
         return False
+
+def check_admin_privileges():
+    """Check if the script is running with administrator privileges"""
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False 
 
 def install_dependencies():
     """Install necessary dependencies"""
@@ -193,44 +193,6 @@ def run_script(script_path, script_name, args=None):
         print(f"❌ Error al ejecutar {script_name}: {e}")
         return False
 
-def restart_as_admin():
-    """Restart the script as administrator"""
-    try:
-        script_path = os.path.abspath(__file__)
-        print(f"🔄 Reiniciando como administrador...")
-        print("(Se abrirá una nueva ventana)")
-        
-        # Use PowerShell to restart as administrator
-        powershell_cmd = f'Start-Process python -ArgumentList "{script_path}" -Verb RunAs'
-        subprocess.run(["powershell", "-Command", powershell_cmd])
-        return True
-    except Exception as e:
-        print(f"❌ Error al reiniciar como administrador: {e}")
-        return False
-
-def ask_for_admin_restart():
-    """Ask if user wants to restart as administrator"""
-    print("\n⚠️  PERMISOS DE ADMINISTRADOR")
-    print("-" * 50)
-    print("Para configurar la ejecución automática (tareas programadas),")
-    print("se necesitan permisos de administrador.")
-    print()
-    print("Opciones:")
-    print("[1] 🔄 Reiniciar como administrador (recomendado)")
-    print("[2] ⏭️  Continuar sin automatización")
-    print("[3] ❌ Cancelar")
-    print()
-    
-    while True:
-        try:
-            choice = input("Selecciona una opción (1-3): ").strip()
-            if choice in ['1', '2', '3']:
-                return choice
-            else:
-                print("❌ Opción no válida. Por favor selecciona 1, 2 o 3.")
-        except KeyboardInterrupt:
-            print("\n❌ Operación cancelada por el usuario.")
-            return '3'
 
 def show_status_info(status, username):
     """Show detailed status information"""
@@ -288,8 +250,6 @@ def show_system_info():
     print("-" * 40)
     print(f"• Sistema: {platform.system()} {platform.release()}")
     print(f"• Python: {sys.version.split()[0]}")
-    is_admin = check_admin_privileges() if is_windows() else False
-    print(f"• Administrador: {'Sí' if is_admin else 'No'}")
     print(f"• Directorio: {get_script_directory()}")
     print()
 
@@ -372,28 +332,8 @@ def main():
         elif choice == '2':  # Configure
             print("\n" + "=" * 60)
             
-            # Check if admin privileges are needed and available
-            is_admin = check_admin_privileges() if is_windows() else True
-            skip_automation = False
-            
-            if is_windows() and not is_admin:
-                admin_choice = ask_for_admin_restart()
-                if admin_choice == '1':
-                    if restart_as_admin():
-                        return  # New process will handle it
-                    else:
-                        print("❌ No se pudo reiniciar como administrador.")
-                        print("Continuando sin automatización...")
-                        skip_automation = True
-                elif admin_choice == '3':
-                    print("❌ Configuración cancelada.")
-                    continue
-                else:  # Choice 2 - continue without automation
-                    skip_automation = True
-            
-            # Run configurator
-            args = ["--skip-automation"] if skip_automation else []
-            if run_script(existing_files['configurador.py'], "configurador", args):
+            # Run configurator directly (no admin privileges needed)
+            if run_script(existing_files['configurador.py'], "configurador"):
                 print("✅ Configuración completada!")
                 print("Actualizando estado...")
                 # Recheck configuration
@@ -416,31 +356,59 @@ def main():
         elif choice == '4':  # Uninstall
             print("\n" + "=" * 60)
             
-            # Check if admin privileges are recommended
-            is_admin = check_admin_privileges() if is_windows() else True
+            # Check admin privileges for uninstall
+            has_admin = check_admin_privileges()
             
-            if is_windows() and not is_admin:
-                print("⚠️  Se recomienda ejecutar la desinstalación como administrador")
-                print("para eliminar completamente las tareas programadas.")
+            if not has_admin:
+                print("⚠️ PERMISOS DE ADMINISTRADOR REQUERIDOS")
+                print("-" * 50)
+                print("• Si creaste tareas programadas, para borrarlas es ")
+                print("  necesario ejecutar el desinstalador como administrador")
                 print()
-                admin_choice = ask_for_admin_restart()
-                if admin_choice == '1':
-                    if restart_as_admin():
-                        return  # New process will handle it
+                print("🔧 OPCIONES:")
+                print("1. Cerrar este programa y ejecutarlo como administrador")
+                print("2. Continuar con desinstalación básica (sin eliminar tareas)")
+                print("3. Eliminar tareas programadas manualmente después")
+                print()
+                
+                while True:
+                    admin_choice = input("¿Deseas continuar sin permisos de administrador? (s/n): ").strip().lower()
+                    if admin_choice in ['s', 'si', 'sí', 'y', 'yes']:
+                        print()
+                        print("📋 DESINSTALACIÓN BÁSICA:")
+                        print("• Se eliminará la configuración del programa")
+                        print("• Las tareas programadas NO se eliminarán automáticamente")
+                        print("• Deberás eliminar las tareas manualmente desde el")
+                        print("  Programador de tareas de Windows si las configuraste")
+                        print()
+                        break
+                    elif admin_choice in ['n', 'no']:
+                        print("❌ Desinstalación cancelada.")
+                        print("Ejecuta este programa como administrador para una desinstalación completa.")
+                        break
                     else:
-                        print("❌ No se pudo reiniciar como administrador.")
-                        print("Continuando con la desinstalación...")
-                elif admin_choice == '3':
-                    print("❌ Desinstalación cancelada.")
+                        print("Por favor, responde 's' para sí o 'n' para no.")
+                
+                if admin_choice in ['n', 'no']:
                     continue
-                # If choice 2, continue with uninstall
             
             print("⚠️ ADVERTENCIA: Esta acción eliminará toda la configuración.")
+            if has_admin:
+                print("• Se eliminarán también las tareas programadas")
+            else:
+                print("• Las tareas programadas deberán eliminarse manualmente")
+            
             while True:
                 confirm = input("¿Estás seguro de que quieres desinstalar? (s/n): ").strip().lower()
                 if confirm in ['s', 'si', 'sí', 'y', 'yes']:
                     if run_script(existing_files['uninstall.py'], "desinstalador"):
                         print("✅ Desinstalación completada!")
+                        if not has_admin:
+                            print()
+                            print("📋 TAREAS PENDIENTES:")
+                            print("• Eliminar tareas programadas manualmente desde")
+                            print("  el Programador de tareas de Windows si las configuraste")
+                            print("• Buscar tareas con nombres como 'UNETI Grade Checker'")
                         # Recheck configuration
                         status, username = check_configuration_status()
                         show_status_info(status, username)

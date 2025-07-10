@@ -286,21 +286,34 @@ def save_username_config(username):
         return False
 
 def ask_for_automation():
-    """Preguntar si quiere automatización"""
+    """Preguntar si quiere automatización y qué tipo"""
     print("\n⚙️ PASO 4: Configuración de automatización")
     print("-" * 40)
-    print("¿Quieres que el verificador se ejecute automáticamente cada 30 minutos?")
-    print("Esto te permitirá recibir notificaciones cuando cambien tus notas.")
+    print("¿Cómo quieres que funcione la automatización?")
     print()
-    
+    print("1. Sin automatización - Solo ejecución manual")
+    print("2. Perpetua - Cada 30 minutos las 24 horas")
+    print("3. Programada - Solo durante horario específico (ej: 9-17)")
+    print()
     while True:
-        response = input("👉 Configurar automatización? (s/n): ").strip().lower()
-        if response in ['s', 'si', 'sí', 'y', 'yes']:
-            return True
-        elif response in ['n', 'no']:
-            return False
+        response = input("👉 Selecciona una opción (1/2/3): ").strip()
+        if response == '1':
+            return 'none'
+        elif response == '2':
+            return 'perpetual'
+        elif response == '3':
+            print("\n⚠️  FUNCIONALIDAD EN MANTENIMIENTO")
+            print("=" * 50)
+            print("La opción de tareas programadas está temporalmente deshabilitada")
+            print("debido a problemas con el formato de fechas en algunos sistemas.")
+            print()
+            print("🔄 Por favor, selecciona la opción 2 (Perpetua) por ahora.")
+            print("Esta funcionalidad estará disponible nuevamente en una próxima actualización.")
+            print("=" * 50)
+            print()
+            continue
         else:
-            print("Por favor, responde 's' para sí o 'n' para no.")
+            print("Por favor, selecciona 1, 2 o 3.")
 
 def create_batch_and_vbs_files():
     """Crear archivos batch y VBS para ejecutar el script manual y automáticamente"""
@@ -359,74 +372,114 @@ WshShell.Run """{python_exe}"" ""{script_path}""", 0, False
         print(f"❌ Error al crear archivos de ejecución: {e}")
         return None, None
 
-def add_to_task_scheduler(silent_vbs_path, start_time, end_time, interval):
+def add_to_task_scheduler(silent_vbs_path, start_time, end_time, interval, automation_mode):
     """Agregar tareas al programador de tareas de Windows usando el archivo VBS"""
     print("\n📅 Configurando tareas programadas...")
     print("-" * 40)
-    
+
     try:
-        # Nombres de las tareas
-        daily_task_name = "VerificadorNotasUNETI_Daily"
-        interval_task_name = "VerificadorNotasUNETI_Interval"
-        
         # Validar que el archivo VBS existe
         if not os.path.exists(silent_vbs_path):
             print(f"❌ El archivo VBS no existe: {silent_vbs_path}")
             return False
-        
+
         # Get current user
         current_user = os.getenv('USERNAME')
+        script_dir = os.path.dirname(silent_vbs_path)
+
+        if automation_mode == 'perpetual':
+            # Crear solo una tarea que se ejecuta cada 30 minutos perpetuamente
+            task_name = "VerificadorNotasUNETI_Perpetual"
+            
+            print("⏳ Creando tarea programada perpetua...")
+            
+            perpetual_task_cmd = [
+                'schtasks', '/create',
+                '/tn', task_name,
+                '/tr', f'wscript.exe "{silent_vbs_path}"',
+                '/sc', 'minute',
+                '/mo', '30',  # Cada 30 minutos
+                '/f'  # Forzar creación
+            ]
+            
+            result = subprocess.run(perpetual_task_cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print("❌ Error al crear la tarea programada perpetua")
+                print(f"Error: {result.stderr}")
+                return False
+            
+            print("✅ Tarea perpetua creada exitosamente!")
+            print(f"📋 Tarea creada:")
+            print(f"   • {task_name} - Se ejecuta cada 30 minutos las 24 horas")
+            print(f"   • Usuario: {current_user}")
+            
+        elif automation_mode == 'scheduled':
+            # Crear script de reset
+            reset_script_path = create_reset_script(script_dir, silent_vbs_path, start_time, end_time, interval)
+            if not reset_script_path:
+                return False
+            
+            # Nombres de las tareas
+            daily_task_name = "VerificadorNotasUNETI_Daily"
+            interval_task_name = "VerificadorNotasUNETI_Interval"
+            
+            print("⏳ Creando tarea programada diaria (reset)...")
+            
+            # Comando para crear la tarea diaria que ejecuta el script de reset
+            daily_task_cmd = [
+                'schtasks', '/create',
+                '/tn', daily_task_name,
+                '/tr', f'wscript.exe "{reset_script_path}"',
+                '/sc', 'daily',
+                '/st', start_time,
+                '/f'  # Forzar creación (sobrescribir si existe)
+            ]
+            
+            result = subprocess.run(daily_task_cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print("❌ Error al crear la tarea programada diaria")
+                print(f"Error: {result.stderr}")
+                return False
+            
+            print("✅ Tarea diaria (reset) creada exitosamente!")
+            
+            print("⏳ Creando tarea programada por intervalos...")
+            
+            # Crear la tarea inicial de intervalos para hoy
+            today = datetime.now().strftime("%m/%d/%Y")
+            
+            interval_task_cmd = [
+                'schtasks', '/create',
+                '/tn', interval_task_name,
+                '/tr', f'wscript.exe "{silent_vbs_path}"',
+                '/sc', 'minute',
+                '/mo', str(interval),
+                '/st', start_time,
+                '/et', end_time,
+                '/sd', today,  # Fecha de inicio: hoy
+                '/ed', today,  # Fecha de fin: hoy
+                '/f'  # Forzar creación
+            ]
+            
+            result = subprocess.run(interval_task_cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print("❌ Error al crear la tarea programada por intervalos")
+                print(f"Error: {result.stderr}")
+                # Eliminar la tarea diaria si falló la de intervalos
+                subprocess.run(['schtasks', '/delete', '/tn', daily_task_name, '/f'], 
+                              capture_output=True, text=True)
+                return False
+            
+            print("✅ Tarea por intervalos creada exitosamente!")
+            print(f"📋 Tareas creadas:")
+            print(f"   • {daily_task_name} - Resetea la tarea diariamente a las {start_time}")
+            print(f"   • {interval_task_name} - Se ejecuta cada {interval} minutos entre {start_time} y {end_time}")
+            print(f"   • Usuario: {current_user}")
+            print(f"   • Script de reset: {reset_script_path}")
         
-        print("⏳ Creando tarea programada diaria...")
-        
-        # Comando para crear la tarea diaria usando el archivo VBS
-        daily_task_cmd = [
-            'schtasks', '/create',
-            '/tn', daily_task_name,
-            '/tr', f'wscript.exe "{silent_vbs_path}"',
-            '/sc', 'daily',
-            '/st', start_time,
-            '/f'  # Forzar creación (sobrescribir si existe)
-        ]
-        
-        result = subprocess.run(daily_task_cmd, capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            print("❌ Error al crear la tarea programada diaria")
-            print(f"Error: {result.stderr}")
-            return False
-        
-        print("✅ Tarea diaria creada exitosamente!")
-        
-        print("⏳ Creando tarea programada por intervalos...")
-        
-        # Comando para crear la tarea que se ejecuta cada intervalo especificado
-        interval_task_cmd = [
-            'schtasks', '/create',
-            '/tn', interval_task_name,
-            '/tr', f'wscript.exe "{silent_vbs_path}"',
-            '/sc', 'minute',
-            '/mo', str(interval),
-            '/st', start_time,
-            '/et', end_time,
-            '/f'  # Forzar creación
-        ]
-        
-        result = subprocess.run(interval_task_cmd, capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            print("❌ Error al crear la tarea programada por intervalos")
-            print(f"Error: {result.stderr}")
-            # Eliminar la tarea diaria si falló la de intervalos
-            subprocess.run(['schtasks', '/delete', '/tn', daily_task_name, '/f'], 
-                          capture_output=True, text=True)
-            return False
-        
-        print("✅ Tarea por intervalos creada exitosamente!")
-        print(f"📋 Tareas creadas:")
-        print(f"   • {daily_task_name} - Se ejecuta diariamente a las {start_time}")
-        print(f"   • {interval_task_name} - Se ejecuta cada {interval} minutos entre {start_time} y {end_time}")
-        print(f"   • Usuario: {current_user}")
         print("\n🔇 MODO SILENCIOSO:")
         print("• Las tareas programadas se ejecutarán completamente en segundo plano")
         print("• No se mostrará ninguna ventana durante la ejecución automática")
@@ -434,13 +487,125 @@ def add_to_task_scheduler(silent_vbs_path, start_time, end_time, interval):
         print("• Para ver el progreso manualmente, usa 'verificador_notas.bat'")
         print("\nPara gestionar las tareas puedes:")
         print("• Abrir 'Programador de tareas' en Windows")
-        print(f"• Buscar las tareas '{daily_task_name}' y '{interval_task_name}'")
+        
+        if automation_mode == 'perpetual':
+            print(f"• Buscar la tarea 'VerificadorNotasUNETI_Perpetual'")
+        else:
+            print(f"• Buscar las tareas 'VerificadorNotasUNETI_Daily' y 'VerificadorNotasUNETI_Interval'")
+        
         print("• Desde ahí puedes habilitarlas, deshabilitarlas o eliminarlas")
         return True
-        
+
     except Exception as e:
         print(f"❌ Error al configurar las tareas programadas: {e}")
         return False
+        
+def create_reset_script(script_dir, silent_vbs_path, start_time, end_time, interval):
+    """Crear script de reset para la tarea programada (con PowerShell como respaldo)"""
+    reset_batch_path = os.path.join(script_dir, "reset_task.bat")
+    reset_vbs_path = os.path.join(script_dir, "reset_task_silent.vbs")
+    log_path = os.path.join(script_dir, "task_reset.log")
+    
+    # Crear el batch script que hace el trabajo real
+    reset_batch_content = f"""@echo off
+REM Script de reset para tarea programada
+REM Elimina y recrea la tarea de intervalos para el día actual
+
+REM Obtener fecha actual usando PowerShell (más confiable)
+for /f "usebackq" %%i in (`powershell -command "Get-Date -Format 'yyyy/MM/dd'"`) do set "today=%%i"
+for /f "usebackq" %%i in (`powershell -command "Get-Date -Format 'yyyy-MM-dd HH:mm:ss'"`) do set "timestamp=%%i"
+
+REM Verificar que la fecha se obtuvo correctamente
+if "%%today%%" == "" (
+    echo ERROR: No se pudo obtener la fecha actual
+    exit /b 1
+)
+
+REM Inicializar log
+echo [%%timestamp%%] Iniciando reset de tarea programada >> "{log_path}"
+echo [%%timestamp%%] Fecha objetivo: %%today%% >> "{log_path}"
+
+REM Eliminar tarea existente
+echo [%%timestamp%%] Eliminando tarea anterior... >> "{log_path}"
+schtasks /delete /tn "VerificadorNotasUNETI_Interval" /f >nul 2>&1
+if %%errorlevel%% equ 0 (
+    echo [%%timestamp%%] Tarea anterior eliminada exitosamente >> "{log_path}"
+) else (
+    echo [%%timestamp%%] No se encontró tarea anterior o error al eliminar >> "{log_path}"
+)
+
+REM Crear nueva tarea para hoy
+echo [%%timestamp%%] Creando nueva tarea para %%today%%... >> "{log_path}"
+schtasks /create ^
+    /tn "VerificadorNotasUNETI_Interval" ^
+    /tr "wscript.exe \\"{silent_vbs_path}\\"" ^
+    /sc minute ^
+    /mo {interval} ^
+    /st {start_time} ^
+    /et {end_time} ^
+    /sd %%today%% ^
+    /ed %%today%% ^
+    /f
+
+REM Verificar resultado
+if %%errorlevel%% equ 0 (
+    echo [%%timestamp%%] ✅ Tarea recreada exitosamente para %%today%% >> "{log_path}"
+    echo [%%timestamp%%] Configuración: cada {interval} min, {start_time}-{end_time} >> "{log_path}"
+) else (
+    echo [%%timestamp%%] ❌ ERROR: No se pudo recrear la tarea >> "{log_path}"
+    echo [%%timestamp%%] Código de error: %%errorlevel%% >> "{log_path}"
+    
+    REM Intentar con formato de fecha diferente
+    echo [%%timestamp%%] Intentando con formato de fecha local... >> "{log_path}"
+    for /f "usebackq" %%i in (`powershell -command "Get-Date -Format 'dd/MM/yyyy'"`) do set "today_alt=%%i"
+    
+    schtasks /create ^
+        /tn "VerificadorNotasUNETI_Interval" ^
+        /tr "wscript.exe \\"{silent_vbs_path}\\"" ^
+        /sc minute ^
+        /mo {interval} ^
+        /st {start_time} ^
+        /et {end_time} ^
+        /sd %%today_alt%% ^
+        /ed %%today_alt%% ^
+        /f >nul 2>&1
+    
+    if %%errorlevel%% equ 0 (
+        echo [%%timestamp%%] ✅ Tarea creada con formato alternativo: %%today_alt%% >> "{log_path}"
+    ) else (
+        echo [%%timestamp%%] ❌ ERROR: Falló también con formato alternativo >> "{log_path}"
+    )
+)
+
+echo [%%timestamp%%] Reset completado >> "{log_path}"
+echo. >> "{log_path}"
+"""
+    
+    # Crear el VBS script para ejecución silenciosa
+    reset_vbs_content = f'''Set WshShell = CreateObject("WScript.Shell")
+WshShell.CurrentDirectory = "{script_dir}"
+WshShell.Run """{reset_batch_path}""", 0, True
+'''
+    
+    try:
+        # Escribir archivo batch
+        with open(reset_batch_path, 'w', encoding='utf-8') as f:
+            f.write(reset_batch_content)
+        
+        # Escribir archivo VBS silencioso
+        with open(reset_vbs_path, 'w', encoding='utf-8') as f:
+            f.write(reset_vbs_content)
+        
+        print(f"✅ Scripts de reset creados:")
+        print(f"   • Batch: {reset_batch_path}")
+        print(f"   • VBS silencioso: {reset_vbs_path}")
+        print(f"   • Log: {log_path}")
+        
+        return reset_vbs_path  # Retornar el VBS para que lo use la tarea diaria
+        
+    except Exception as e:
+        print(f"❌ Error al crear scripts de reset: {e}")
+        return None
 
 def run_grade_checker():
     """Ejecutar el verificador de notas por primera vez"""
@@ -628,16 +793,18 @@ def main():
         
         if args.skip_automation:
             print("\n⚠️  Omitiendo configuración de automatización")
-            automate = False
+            automation_mode = 'none'
             # Valores por defecto para cuando se omite la automatización
             start_time, end_time, interval = "08:00", "22:00", 30
         else:
-            automate = ask_for_automation()
-            if automate:
-                # Obtener horario solo si se va a automatizar
+            automation_mode = ask_for_automation()
+            # Nota: La opción 'scheduled' ya no puede ser devuelta por ask_for_automation()
+            # pero mantenemos la lógica por si se reactiva en el futuro
+            if automation_mode == 'scheduled':
+                # Esta rama nunca se ejecutará debido a la modificación en ask_for_automation()
                 start_time, end_time, interval = get_time_schedule()
             else:
-                # Valores por defecto para cuando no se automatiza
+                # Valores por defecto para otros modos
                 start_time, end_time, interval = "08:00", "22:00", 30
         
         # Crear archivos batch (manual) y VBS (silencioso)
@@ -649,8 +816,8 @@ def main():
             return
         
         # Configurar automatización si se solicitó
-        if automate:
-            if add_to_task_scheduler(silent_vbs_path, start_time, end_time, interval):
+        if automation_mode != 'none':
+            if add_to_task_scheduler(silent_vbs_path, start_time, end_time, interval, automation_mode):
                 automation_enabled = True
             else:
                 print("⚠️  La tarea programada no se pudo crear, pero puedes ejecutar manualmente.")
@@ -671,6 +838,7 @@ def main():
         traceback.print_exc()
     
     input("\nPresiona Enter para salir...")
+
 
 if __name__ == "__main__":
     main()

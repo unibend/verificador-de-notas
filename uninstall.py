@@ -138,7 +138,8 @@ def remove_scheduled_tasks():
     tasks_to_remove = [
         "VerificadorNotasUNETI",  # Tarea antigua (una sola tarea)
         "VerificadorNotasUNETI_Daily",  # Tarea diaria nueva
-        "VerificadorNotasUNETI_Interval"  # Tarea de intervalo nueva
+        "VerificadorNotasUNETI_Interval",  # Tarea de intervalo nueva
+        "VerificadorNotasUNETI_Perpetual"  # Tarea perpetua nueva
     ]
     
     tasks_found = []
@@ -214,9 +215,11 @@ def ask_delete_files():
         ("config.json", "Configuración de usuario y credenciales"),
         ("verificador_notas.bat", "Archivo batch para ejecución manual"),
         ("verificador_notas_silent.vbs", "Archivo VBS para ejecución silenciosa"),
+        ("reset_task.bat", "Script batch para reset de tareas programadas"),
+        ("reset_task_silent.vbs", "Script VBS silencioso para reset de tareas"),
         ("previous_grades.json", "Datos de notas anteriores guardadas"),
         ("grade_history.txt", "Historial completo de cambios de notas"),
-        ("grade_checker.py.backup", "Backup del archivo original del verificador"),
+        ("task_reset.log", "Log de operaciones de reset de tareas"),
         ("notas_actuales.txt", "Archivo de texto con las calificaciones actuales"),
     ]
     
@@ -291,7 +294,7 @@ def show_manual_cleanup_instructions():
     print("• grade_history.txt - Historial de cambios")
     print("• grade_checker.py.backup - Backup del script original")
 
-def show_final_message(credentials_removed, task_removed, files_deleted, token_reset):
+def show_final_message(credentials_removed, task_removed, files_deleted):
     """Mostrar mensaje final"""
     print("\n🎯 DESINSTALACIÓN COMPLETADA")
     print("=" * 60)
@@ -318,10 +321,6 @@ def show_final_message(credentials_removed, task_removed, files_deleted, token_r
     # Resumen de archivos
     if files_deleted:
         print("✅ Archivos seleccionados eliminados")
-    
-    # Resumen de token
-    if token_reset:
-        print("✅ Token de API reseteado en el script")
     
     print()
     print("📋 ESTADO ACTUAL:")
@@ -412,11 +411,8 @@ def main():
         files_to_delete = ask_delete_files()
         files_deleted = delete_files(files_to_delete) if files_to_delete else False
         
-        # Paso 4: Preguntar por resetear token
-        token_reset = reset_api_token()
-        
         # Mostrar resumen final
-        show_final_message(credentials_removed, task_removed, files_deleted, token_reset)
+        show_final_message(credentials_removed, task_removed, files_deleted)
         
     except KeyboardInterrupt:
         print("\n\n❌ Desinstalación cancelada por el usuario.")
