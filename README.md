@@ -43,9 +43,9 @@ Haz click en el botón "Verificar Notas". Espera que el proceso termine y haz cl
 
 ### 🗑️ Desinstalación:
 
-Para eliminar tus credenciales, haz click en "Configuración" y luego "Cerrar Sesión". 
-Para que el programa deje de verificar tus notas automáticamente, haz click en "Configuración" y luego "Detener Automatización"
-Para borrar todos los archivos relacionados al programa, haz click en "Configuración" y luego "Desinstalar".
+- Para eliminar tus credenciales, haz click en "Configuración" y luego "Cerrar Sesión". 
+- Para que el programa deje de verificar tus notas automáticamente, haz click en "Configuración" y luego "Detener Automatización"
+- Para borrar todos los archivos relacionados al programa, haz click en "Configuración" y luego "Desinstalar".
 
 
 
