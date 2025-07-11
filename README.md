@@ -31,6 +31,7 @@ Haz click en el botón de Configuración e ingresa tus credenciales, luego estab
 
 - **Almacenamiento Seguro**: Tu token de API se almacena de forma segura en el gestor de credenciales de Windows (keyring)
 - **Cifrado Automático**: Windows cifra automáticamente las credenciales almacenadas
+- El ejecutable fue creado con pyinstaller, por lo que puede dar falsos positivos en antivirus. Si esto te preocupa, puedes decargar el codigo fuente y ejecutar el archivo main.py directamente, o crear tu propio ejecutable a partir del codigo fuente.
 
 
 
