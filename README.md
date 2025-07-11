@@ -21,7 +21,7 @@ Este proyecto es una herramienta útil para los estudiantes de la UNETI que dese
 1. Ve a la página de [Releases](https://github.com/unibend/verificador-de-notas/releases) y descarga el archivo `.exe` de la última versión.
 2. Ejecuta el archivo exe para usar el programa.
 
-⚡ Si quieres que el programa se ejecute automáticamente cada vez que enciendas tu PC sin tener que abrirlo, puedes agregarlo al menú de inicio. Para esto abre el diálogo de ejecutar (Windows + R) y escribe `shell:startup`, luego copia el archivo exe que descargaste a esa carpeta.
+⚡ Si quieres que el programa se ejecute automáticamente cada vez que enciendas tu PC sin tener que abrirlo, puedes agregarlo al menú de inicio. Para esto haz click derecho sobre el programa que descargaste. Selecciona `Enviar a > Escritorio` . Luego, abre el diálogo de ejecutar (Windows + R) y escribe `shell:startup`, luego copia el shortcut de tu escritorio a esa carpeta.
 
 ### 🔧 Configuración:
 
